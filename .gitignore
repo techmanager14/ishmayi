@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+.env*
+!.env.example
+.vercel
+
+# Original customer video files (compressed copies live in public/reviews)
+/WhatsApp Video*.mp4
+
+# Personal Claude Code settings
+/.claude/settings.local.json
+/video_*.mp4

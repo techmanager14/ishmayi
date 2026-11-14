@@ -59,7 +59,7 @@ async function recordInGhl(order: PendingOrder, payment: OrderPayment): Promise<
     // Signed-in customer: keep the order on their account. Details are a convenience, so a refusal (e.g. phone on another contact) doesn't matter.
     await updateContact(contactId, { phone: c.phone, ...own }).catch((err) => console.warn(`[order] ${order.ref} contact not updated: ${err instanceof Error ? err.message : "error"}`));
   } else {
-    contactId = await upsertContact({ fullName: c.fullName, email: c.email, phone: c.phone, ...own, source: "Trivana website" });
+    contactId = await upsertContact({ fullName: c.fullName, email: c.email, phone: c.phone, ...own, source: "Ishmayi website" });
   }
   const tags = ["website-order", payment.method === "cod" ? "cod" : "paid-online", ...(c.gift ? ["gift-order"] : [])];
   try {
@@ -67,7 +67,7 @@ async function recordInGhl(order: PendingOrder, payment: OrderPayment): Promise<
   } catch (err) {
     // The account's contact is gone (deleted or merged in GHL). A paid order must still be recorded.
     console.warn(`[order] ${order.ref} contact ${contactId} unusable, finding by email: ${err instanceof Error ? err.message : "error"}`);
-    contactId = await upsertContact({ fullName: c.fullName, email: c.email, phone: c.phone, ...own, source: "Trivana website" });
+    contactId = await upsertContact({ fullName: c.fullName, email: c.email, phone: c.phone, ...own, source: "Ishmayi website" });
     await addTags(contactId, tags);
   }
   await addNote(contactId, orderNote(order, payment));
@@ -142,7 +142,7 @@ export async function recordOrder(order: PendingOrder, payment: OrderPayment): P
       cfg,
       {
         event: payment.method === "online" ? "order.paid" : "order.placed",
-        source: "trivana_website",
+        source: "ishmayi_website",
         submissionId: id,
         placedAt: new Date().toISOString(),
         order: { ref: order.ref, lines: order.lines, subtotal: order.subtotal, shipping: order.shipping, total: order.total, currency: order.currency },

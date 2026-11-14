@@ -25,7 +25,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <>
       <PageTitle
         title="Products"
-        sub="Products, prices and photos live in your GoHighLevel store. Only products in an on-sale category appear on the website."
+        sub="Only products in a live category show on the website."
         actions={
           <Link href="/admin/products/new" className={btn.primary}>
             + Add product
@@ -46,7 +46,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <Empty>
             {view === "sale" ? (
               <>
-                Nothing on sale yet. <Link href="/admin/products/new" className="font-bold text-[#ff8197]">Add a product</Link> and tick Necklaces, Pyrite
+                Nothing on sale yet. <Link href="/admin/products/new" className="font-bold text-burgundy">Add a product</Link> and tick Necklaces, Pyrite
                 Anklets or Fashion Jewellery.
               </>
             ) : (

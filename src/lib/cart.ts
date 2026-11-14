@@ -15,11 +15,11 @@ export interface CartLine {
   qty: number;
 }
 
-const KEY = "trivana-cart-v1";
+const KEY = "ishmayi-cart-v1";
 export const MAX_QTY = 10;
 export const MAX_LINES = 20;
-const EVENT = "trivana:cart-change";
-const OPEN_EVENT = "trivana:cart-open";
+const EVENT = "ishmayi:cart-change";
+const OPEN_EVENT = "ishmayi:cart-open";
 
 let cache: CartLine[] | null = null;
 const EMPTY: CartLine[] = [];

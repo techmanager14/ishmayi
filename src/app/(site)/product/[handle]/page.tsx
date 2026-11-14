@@ -5,6 +5,10 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductView } from "@/components/ProductView";
 import { Breadcrumbs, SectionHeading } from "@/components/Sections";
 import { getCollection, getProduct } from "@/lib/catalog";
+import { getCms } from "@/lib/cms";
+import { perfectMatches } from "@/lib/catalog/pairs";
+import { productPromises } from "@/lib/promises";
+import { couponConditions, couponValue, publicCoupons } from "@/lib/promo-codes";
 import { ALL_HANDLE } from "@/lib/catalog/config";
 import { site } from "@/lib/site";
 
@@ -29,8 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { handle } = await params;
-  const [product, all] = await Promise.all([getProduct(handle), getCollection(ALL_HANDLE)]);
+  const [product, all, cms] = await Promise.all([getProduct(handle), getCollection(ALL_HANDLE), getCms()]);
   if (!product) notFound();
+  const matches = await perfectMatches([product.handle]);
 
   const related = (all ?? []).filter((p) => p.handle !== product.handle && p.available && p.image).slice(0, RELATED_COUNT);
   const lowest = product.variants.reduce((a, b) => (b.price < a.price ? b : a));
@@ -52,10 +57,10 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <>
-      <div className="container-page pt-5 md:pt-7">
+      <div className="container-page hidden pt-7 md:block">
         <Breadcrumbs items={[{ href: "/shop", label: "Shop" }, { label: product.title }]} />
       </div>
-      <ProductView product={product} />
+      <ProductView product={product} matches={matches} promises={productPromises(cms, product.handle)} offers={publicCoupons(cms).map((c) => ({ code: c.code, value: couponValue(c), conditions: couponConditions(c) }))} />
       {related.length > 0 && (
         <section className="container-page border-t border-parchment py-12 md:py-20" aria-labelledby="related-title">
           <SectionHeading id="related-title" align="left" title="You may also like" />

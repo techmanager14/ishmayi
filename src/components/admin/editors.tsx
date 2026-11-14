@@ -79,7 +79,7 @@ export function BannersEditor({ initial, categories }: { initial: CmsBanner[]; c
         onClick={() =>
           setList([
             ...list,
-            { id: newId("banner"), enabled: true, eyebrow: "", title: "New banner", highlight: "", body: "", ctaLabel: "Shop now →", ctaHref: "/shop", secondaryLabel: "", secondaryHref: "", image: "", video: "", productsFrom: "", tone: "light" },
+            { id: newId("banner"), enabled: true, eyebrow: "", title: "New banner", highlight: "", body: "", ctaLabel: "Shop now", ctaHref: "/shop", secondaryLabel: "", secondaryHref: "", image: "", video: "", productsFrom: "", tone: "light" },
           ])
         }
         className={btn.outline}
@@ -128,12 +128,12 @@ export function CategoriesEditor({ initial, counts }: { initial: CmsCategory[]; 
     const label = name.trim();
     const handle = slugify(label);
     if (!label || !handle || list.some((c) => c.handle === handle)) return;
-    setList([...list, { handle, label, blurb: "", status: "soon", image: "" }]);
+    setList([...list, { handle, label, blurb: "", status: "live", image: "" }]);
     setName("");
   };
   return (
     <CmsForm patch={{ categories: list }}>
-      <Panel title="Add a category" sub="Creates a matching product collection in GoHighLevel when you save. New categories start as “Coming soon”.">
+      <Panel title="Add a category" sub="Shows on the website once saved.">
         <div className="flex flex-wrap gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())} placeholder="e.g. Bangles" aria-label="New category name" className={`${input} max-w-sm`} />
           <button type="button" onClick={add} className={btn.outline}>
@@ -191,7 +191,7 @@ export function ReviewsEditor({ initial }: { initial: CmsContent["reviews"] }) {
             ["texts", `Written reviews (${texts.length})`],
           ] as const
         ).map(([k, l]) => (
-          <button key={k} type="button" onClick={() => setTab(k)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${tab === k ? "bg-[#e3425c] text-white" : "text-ink-muted"}`}>
+          <button key={k} type="button" onClick={() => setTab(k)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${tab === k ? "bg-[#5e0f2c] text-white" : "text-ink-muted"}`}>
             {l}
           </button>
         ))}
@@ -235,7 +235,7 @@ export function ReviewsEditor({ initial }: { initial: CmsContent["reviews"] }) {
                   <Text id={`t${i}-n`} label="Name" value={t.name} onChange={(x) => updT(i, { name: x })} />
                   <Text id={`t${i}-c`} label="City (optional)" value={t.city ?? ""} onChange={(x) => updT(i, { city: x || undefined })} />
                   <Text id={`t${i}-r`} label="Title / role (optional)" value={t.role ?? ""} onChange={(x) => updT(i, { role: x || undefined })} />
-                  <Text id={`t${i}-s`} label="Service tag" value={t.service} onChange={(x) => updT(i, { service: x })} placeholder="e.g. Numerology consultation" />
+                  <Text id={`t${i}-s`} label="Service tag" value={t.service} onChange={(x) => updT(i, { service: x })} placeholder="e.g. Jewellery" />
                 </div>
                 <Text id={`t${i}-h`} label="Highlight (shown on the card)" area rows={2} value={t.highlight} onChange={(x) => updT(i, { highlight: x })} />
                 <Text
@@ -274,7 +274,7 @@ export function ContentEditor({ initial }: { initial: Pick<CmsContent, "announce
   const [faqs, setFaqs] = useState(initial.faqs);
   return (
     <CmsForm patch={{ announcement, faqs }}>
-      <Panel title="Announcement bar" sub="A thin strip at the very top of every page — offers, launches, holidays.">
+      <Panel title="Announcement bar" sub="Thin strip above every page.">
         <Toggle checked={announcement.enabled} onChange={(v) => setAnn((p_) => ({ ...p_, enabled: v }))} label="Show the announcement bar" />
         <div className="grid gap-3 md:grid-cols-2">
           <Text id="ann-text" label="Text" value={announcement.text} onChange={(v) => setAnn((announcement_) => ({ ...announcement_, text: v }))} placeholder="New arrivals are here" />
@@ -282,7 +282,7 @@ export function ContentEditor({ initial }: { initial: Pick<CmsContent, "announce
         </div>
       </Panel>
 
-      <Panel title="FAQs" sub="Shown on the FAQs page, grouped by topic.">
+      <Panel title="FAQs" sub="Grouped by topic.">
         {faqs.map((g, gi) => {
           const updG = (patch: Partial<typeof g>) => setFaqs((cur) => cur.map((x, j) => (j === gi ? { ...x, ...patch } : x)));
           return (
@@ -290,12 +290,20 @@ export function ContentEditor({ initial }: { initial: Pick<CmsContent, "announce
               <Text id={`g${gi}`} label="Topic" value={g.title} onChange={(v) => updG({ title: v })} />
               <ul className="mt-3 space-y-3">
                 {g.items.map((f, fi) => (
-                  <li key={fi} className="space-y-2 rounded-lg bg-panel p-3">
-                    <input aria-label="Question" value={f.q} onChange={(e) => updG({ items: g.items.map((x, k) => (k === fi ? { ...x, q: e.target.value } : x)) })} className={`${input} font-semibold`} />
-                    <textarea aria-label="Answer" rows={3} value={f.a} onChange={(e) => updG({ items: g.items.map((x, k) => (k === fi ? { ...x, a: e.target.value } : x)) })} className={input} />
-                    <button type="button" onClick={() => updG({ items: g.items.filter((_, k) => k !== fi) })} className={`${btn.ghost} text-rose-300`}>
+                  <li key={fi}>
+                    <details open={!f.q} className="group/faq rounded-lg bg-panel">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0 truncate">{f.q || "New question"}</span>
+                        <span className="shrink-0 text-xs text-ink-muted group-open/faq:hidden">Edit</span>
+                      </summary>
+                      <div className="space-y-2 px-3 pb-3">
+                        <input aria-label="Question" value={f.q} onChange={(e) => updG({ items: g.items.map((x, k) => (k === fi ? { ...x, q: e.target.value } : x)) })} className={`${input} font-semibold`} />
+                        <textarea aria-label="Answer" rows={3} value={f.a} onChange={(e) => updG({ items: g.items.map((x, k) => (k === fi ? { ...x, a: e.target.value } : x)) })} className={input} />
+                        <button type="button" onClick={() => updG({ items: g.items.filter((_, k) => k !== fi) })} className={`${btn.ghost} text-rose-800`}>
                       Remove question
                     </button>
+                      </div>
+                    </details>
                   </li>
                 ))}
               </ul>
@@ -331,7 +339,7 @@ export function SettingsEditor({ initial, categories }: { initial: Pick<CmsConte
   return (
     <CmsForm patch={{ store, business, seo, social, sections, contact }}>
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="Store" sub="Checkout, delivery and shipping.">
+        <Panel title="Store" sub="Delivery and shipping.">
           <Toggle checked={store.ordersOpen} onChange={(v) => setStore((p_) => ({ ...p_, ordersOpen: v }))} label="Online ordering open" hint="Switch off to pause orders (holidays, stock-taking). The shop stays visible." />
           {!store.ordersOpen && (
             <Text id="closed-msg" label="Message shown at checkout while paused" area rows={2} value={store.closedMessage} onChange={(v) => setStore((p_) => ({ ...p_, closedMessage: v }))} />
@@ -344,35 +352,22 @@ export function SettingsEditor({ initial, categories }: { initial: Pick<CmsConte
           <div className="grid gap-3 sm:grid-cols-2">
             {numberField("cod-max", "COD limit ₹", store.codMaxAmount, (n) => setStore((store_) => ({ ...store_, codMaxAmount: n })), "Orders above this must be paid online. 0 = no limit.")}
             <Text id="days" label="Delivery time (days)" value={store.deliveryDays} onChange={(v) => setStore((store_) => ({ ...store_, deliveryDays: v }))} placeholder="7–15" />
-            {numberField("benefit", "Consultation benefit ₹", store.benefitAmount, (n) => setStore((store_) => ({ ...store_, benefitAmount: n })))}
+            {numberField("benefit", "Loyalty reward ₹", store.benefitAmount, (n) => setStore((store_) => ({ ...store_, benefitAmount: n })))}
             {numberField("benefit-h", "Benefit valid for (hours)", store.benefitHours, (n) => setStore((store_) => ({ ...store_, benefitHours: n })))}
-          </div>
-          <div>
-            <label className={label} htmlFor="zodiac">
-              Zodiac necklaces come from
-            </label>
-            <select id="zodiac" value={store.zodiacCategory} onChange={(e) => setStore((store_) => ({ ...store_, zodiacCategory: e.target.value }))} className={input}>
-              {categories.map((c) => (
-                <option key={c.handle} value={c.handle}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-ink-muted">A product with a sign’s name (e.g. “Leo”) links from that sign on the home page.</p>
           </div>
         </Panel>
 
-        <Panel title="Contact details" sub="Footer, contact page, WhatsApp button.">
+        <Panel title="Contact details" sub="Footer, contact page, WhatsApp.">
           <Toggle checked={store.whatsappButton} onChange={(v) => setStore((p_) => ({ ...p_, whatsappButton: v }))} label="Floating WhatsApp button" />
           <Text id="wa-msg" label="WhatsApp message (pre-filled)" value={store.whatsappMessage} onChange={(v) => setStore((p_) => ({ ...p_, whatsappMessage: v }))} />
           <div className="grid gap-3 sm:grid-cols-2">
             <Text id="c-phone" label="Phone" value={contact.phone} onChange={(v) => setContact((contact_) => ({ ...contact_, phone: v }))} />
             <Text id="c-email" label="Email" value={contact.email} onChange={(v) => setContact((contact_) => ({ ...contact_, email: v }))} />
-            <Text id="c-wa" label="WhatsApp (with country code)" value={contact.whatsapp} onChange={(v) => setContact((contact_) => ({ ...contact_, whatsapp: v.replace(/\D/g, "") }))} placeholder="918169735026" />
+            <Text id="c-wa" label="WhatsApp (with country code)" value={contact.whatsapp} onChange={(v) => setContact((contact_) => ({ ...contact_, whatsapp: v.replace(/\D/g, "") }))} placeholder="919876543210" />
           </div>
         </Panel>
 
-        <Panel title="Business & invoices" sub="Printed on invoices sent from the admin.">
+        <Panel title="Business & invoices" sub="Printed on invoices.">
           <Text id="bz-name" label="Business name" value={business.name} onChange={(v) => setBusiness((business_) => ({ ...business_, name: v }))} />
           <Text id="bz-addr" label="Address" area rows={2} value={business.address} onChange={(v) => setBusiness((business_) => ({ ...business_, address: v }))} />
           <div className="grid gap-3 sm:grid-cols-3">
@@ -383,19 +378,19 @@ export function SettingsEditor({ initial, categories }: { initial: Pick<CmsConte
           <Text id="bz-terms" label="Default invoice notes & terms" area rows={3} value={business.invoiceTerms} onChange={(v) => setBusiness((business_) => ({ ...business_, invoiceTerms: v }))} />
         </Panel>
 
-        <Panel title="SEO & sharing" sub="How the site appears on Google and when shared on WhatsApp / social media.">
+        <Panel title="SEO & sharing" sub="Google and link previews.">
           <Text id="seo-t" label="Site title" value={seo.title} onChange={(v) => setSeo((seo_) => ({ ...seo_, title: v }))} />
           <Text id="seo-d" label="Description" area rows={2} value={seo.description} onChange={(v) => setSeo((seo_) => ({ ...seo_, description: v }))} />
           <MediaField label="Share image" value={seo.image} onChange={(v) => setSeo((seo_) => ({ ...seo_, image: v }))} hint="1200 × 630 works best." />
         </Panel>
 
-        <Panel title="Social media" sub="Icons in the footer (leave empty to hide).">
+        <Panel title="Social media" sub="Footer icons. Empty = hidden.">
           <Text id="so-ig" label="Instagram" value={social.instagram} onChange={(v) => setSocial((social_) => ({ ...social_, instagram: v }))} placeholder="https://instagram.com/…" />
           <Text id="so-fb" label="Facebook" value={social.facebook} onChange={(v) => setSocial((social_) => ({ ...social_, facebook: v }))} placeholder="https://facebook.com/…" />
           <Text id="so-yt" label="YouTube" value={social.youtube} onChange={(v) => setSocial((social_) => ({ ...social_, youtube: v }))} placeholder="https://youtube.com/@…" />
         </Panel>
 
-        <Panel title="Home page sections" sub="Switch whole sections on or off.">
+        <Panel title="Home page sections" sub="Show or hide sections.">
           <div className="grid gap-3 sm:grid-cols-2">
             {SECTION_KEYS.map((k) => (
               <Toggle key={k} checked={sections[k]} onChange={(v) => setSections((sections_) => ({ ...sections_, [k]: v }))} label={SECTION_LABELS[k]} />

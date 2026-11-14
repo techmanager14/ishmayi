@@ -2,28 +2,33 @@ const clean = (value: string | undefined) => (value ?? "").trim();
 
 export const site = {
   name: "Ishmayi",
-  /** The registered business behind the store: used on invoices and in legal notices. */
-  legalName: "Trivana Creations LLP",
+  /** The registered business behind the store (invoices, legal notices). Set NEXT_PUBLIC_LEGAL_NAME if it differs from the brand. */
+  legalName: clean(process.env.NEXT_PUBLIC_LEGAL_NAME) || "Ishmayi",
   tagline: "Premium Adornments & Heritage",
   description: "Ishmayi is a premium jewellery house: stone and pearl jewellery, gemstones, textiles and curated collections, delivered across India.",
   url: (clean(process.env.NEXT_PUBLIC_SITE_URL) || "http://localhost:3000").replace(/\/$/, ""),
+  // Ishmayi's registered office. Empty fields are hidden on the site until filled in.
   address: {
-    street: "A 102, Mansi Regency CHS Ltd., I C Colony",
-    locality: "Borivali West",
-    city: "Mumbai",
-    postalCode: "400103",
-    region: "Maharashtra",
+    street: clean(process.env.NEXT_PUBLIC_ADDRESS_STREET),
+    locality: clean(process.env.NEXT_PUBLIC_ADDRESS_LOCALITY),
+    city: clean(process.env.NEXT_PUBLIC_ADDRESS_CITY),
+    postalCode: clean(process.env.NEXT_PUBLIC_ADDRESS_POSTCODE),
+    region: clean(process.env.NEXT_PUBLIC_ADDRESS_REGION),
     country: "IN",
   },
-  // Business contact details (from the client's GoHighLevel profile); env vars override.
+  // Ishmayi's contact details (also editable in Admin → Settings).
   contact: {
-    phone: clean(process.env.NEXT_PUBLIC_CONTACT_PHONE) || "+91 81697 35026",
-    email: clean(process.env.NEXT_PUBLIC_CONTACT_EMAIL) || "trivanacreations99@gmail.com",
-    whatsapp: (clean(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER) || "918169735026").replace(/\D/g, ""),
+    phone: clean(process.env.NEXT_PUBLIC_CONTACT_PHONE),
+    email: clean(process.env.NEXT_PUBLIC_CONTACT_EMAIL),
+    whatsapp: clean(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER).replace(/\D/g, ""),
   },
   gaId: clean(process.env.NEXT_PUBLIC_GA_ID),
-  /** Cash on Delivery is not offered (client decision): every order is paid online. */
-  codEnabled: false as boolean,
+  /**
+   * Cash on Delivery master switch (NEXT_PUBLIC_ALLOW_COD=false turns it off everywhere).
+   * At checkout COD is offered when the admin turns it on, or automatically while online
+   * payment (Razorpay) isn't set up — see codOffered() in lib/payments.
+   */
+  codEnabled: process.env.NEXT_PUBLIC_ALLOW_COD !== "false",
   /** Flip to true once the business has reviewed the policy pages. */
   policiesReviewed: true,
 } as const;
@@ -46,6 +51,12 @@ export const whatsappLink = (text?: string) =>
   site.contact.whatsapp
     ? `https://wa.me/${site.contact.whatsapp}${text ? `?text=${encodeURIComponent(text)}` : ""}`
     : "";
+
+/** The registered address as one line, or "" while it hasn't been set. */
+export const addressLine = [site.address.street, site.address.locality, [site.address.city, site.address.postalCode].filter(Boolean).join(" – ")].filter(Boolean).join(", ");
+
+/** "Operated by …" only says something when the legal name differs from the brand. */
+export const operatedBy = site.legalName !== site.name ? site.legalName : "";
 
 export const hasAnyContact = Boolean(site.contact.phone || site.contact.email || site.contact.whatsapp);
 

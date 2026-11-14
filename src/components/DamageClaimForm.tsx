@@ -108,7 +108,7 @@ export function DamageClaimForm() {
                 <label htmlFor="dc-order" className="field-label">
                   Order number
                 </label>
-                <input id="dc-order" required value={order} onChange={(e) => setOrder(e.target.value)} placeholder="TRV-ABC123" autoComplete="off" className="field-input uppercase" />
+                <input id="dc-order" required value={order} onChange={(e) => setOrder(e.target.value)} placeholder="ISH-ABC123" autoComplete="off" className="field-input uppercase" />
               </div>
               <div>
                 <label htmlFor="dc-phone" className="field-label">

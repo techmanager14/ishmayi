@@ -121,7 +121,7 @@ export async function createOpportunity(opts: {
     monetaryValue: opts.value,
   };
   try {
-    await post("/opportunities/", { ...card, locationId: env("GHL_LOCATION_ID"), contactId: opts.contactId, source: "Trivana website" });
+    await post("/opportunities/", { ...card, locationId: env("GHL_LOCATION_ID"), contactId: opts.contactId, source: "Ishmayi website" });
   } catch (err) {
     // GHL allows one card per contact per pipeline (unless duplicates are enabled in its
     // settings): a returning customer's card is updated and moved back to the first stage.

@@ -6,8 +6,9 @@
 import { brand, pillars, story } from "@/content/brand";
 import { faqGroups, type Faq } from "@/content/faqs";
 import type { QA, Testimonial } from "@/content/testimonials";
+import { occasions as builtInOccasions } from "@/data/shelves";
 import { catalogue } from "./catalogue";
-import { nav, site, storeDefaults } from "./site";
+import { addressLine, nav, site, storeDefaults } from "./site";
 
 export type CategoryStatus = "live" | "soon" | "hidden";
 export interface CmsCategory {
@@ -19,6 +20,21 @@ export interface CmsCategory {
   /** Tile image; empty = first product photo, then artwork. */
   image: string;
 }
+
+/** A "Shop by Occasion" card on the home page. */
+export interface CmsOccasion {
+  /** Link slug: /shop?collection=<id>. */
+  id: string;
+  title: string;
+  blurb: string;
+  image: string;
+  enabled: boolean;
+  /** Products picked by the admin (ids). */
+  products: string[];
+  /** Also include products whose names match the built-in words (built-in occasions only). */
+  autoMatch: boolean;
+}
+export const MAX_OCCASION_PRODUCTS = 80;
 
 export type BannerTone = "light" | "dark" | "cream";
 export interface CmsBanner {
@@ -128,6 +144,12 @@ export interface CmsContent {
   faqs: { title: string; id: string; items: Faq[] }[];
   reviews: { videos: CmsVideoReview[]; texts: CmsTextReview[] };
   coupons: CmsCoupon[];
+  /** Perfect match: product id → ids of products suggested with it (both ways). */
+  pairings: Record<string, string[]>;
+  /** Promises shown on a product page: product id → preset ids (lib/promises) or custom text. Missing = the defaults. */
+  promises: Record<string, string[]>;
+  /** Home "Shop by Occasion": heading and cards. */
+  occasions: { title: string; items: CmsOccasion[] };
   pages: CmsPages;
   nav: { label: string; href: string }[];
   /** Custom policy text (simple formatting); empty = the built-in policy. */
@@ -185,46 +207,10 @@ export const defaultCms: CmsContent = {
   contentRev: CONTENT_REV,
   announcement: { enabled: false, text: "", link: "" },
   banners: [
-    banner({
-      id: "offers",
-      tone: "dark",
-      eyebrow: "Special offers",
-      title: "The season's",
-      highlight: "finest offers.",
-      body: "Promo codes, limited-time campaigns and pieces at reduced prices, all in one place.",
-      ctaLabel: "View offers",
-      ctaHref: "/offers",
-    }),
-    banner({
-      id: "catalogue",
-      tone: "cream",
-      eyebrow: "Product catalogue",
-      title: "The complete",
-      highlight: "Ishmayi catalogue.",
-      body: "Necklaces, anklets, bangles and statement sets. Browse everything, then filter by price or availability.",
-      ctaLabel: "Shop all",
-      ctaHref: "/shop",
-    }),
-    banner({
-      id: "lookbook",
-      tone: "light",
-      eyebrow: "The lookbook",
-      title: "Made to be",
-      highlight: "worn.",
-      body: "Explore by material, gemstone and style to find what feels like you.",
-      ctaLabel: "Explore",
-      ctaHref: "/explore",
-    }),
-    banner({
-      id: "seasonal",
-      tone: "dark",
-      eyebrow: "Seasonal campaign",
-      title: "A festive edit for",
-      highlight: "Diwali.",
-      body: "Jewellery for gifting and celebration, chosen for the season of light.",
-      ctaLabel: "See the campaign",
-      ctaHref: "/offers#limited-offers",
-    }),
+    banner({ id: "catalogue", tone: "light", image: "/banners/catalogue.jpg", ctaHref: "/shop", body: "Explore the complete Ishmayi catalogue: bracelets, pendants, necklaces, earrings, rings and hasli. Many pieces are 18K gold plated, also available in silver and rhodium plated finishes." }),
+    banner({ id: "lookbook", tone: "light", image: "/banners/lookbook.jpg", ctaHref: "/explore", body: "The lookbook: jewellery crafted with natural semi-precious stones, real pearls, 316L stainless steel and 925 sterling silver." }),
+    banner({ id: "diwali-launch", enabled: false, tone: "dark", image: "/banners/diwali-launch.jpg", ctaHref: "/offers", body: "Brand launch and Diwali celebration: up to 30% off on all products." }),
+    banner({ id: "diwali-offers", enabled: false, tone: "dark", image: "/banners/diwali-offers.jpg", ctaHref: "/offers", body: "Diwali celebration offers: buy 1 get 1 free, 30% off on all products, promo codes and a flash sale." }),
   ],
   videos: [],
   categories: [
@@ -236,10 +222,16 @@ export const defaultCms: CmsContent = {
   faqs: faqGroups,
   reviews: { videos: [], texts: [] },
   coupons: [],
+  pairings: {},
+  promises: {},
+  occasions: {
+    title: "Shop by Occasion",
+    items: builtInOccasions.map((o) => ({ id: o.slug, title: o.title, blurb: o.blurb, image: o.image ?? "", enabled: true, products: [], autoMatch: true })),
+  },
   pages: {
     brand: { tagline: brand.tagline, promise: brand.promise, essence: brand.essence },
     headings: {
-      categories: { title: "Shop by Category", sub: "Jewellery, textiles and art, chosen with care." },
+      categories: { title: "Shop by Category", sub: "Natural stones, pearls, sterling silver and demifine steel." },
       offers: { title: "Offers & Discounts", sub: "Every way to save, in one place." },
       limited: { title: "Limited-Time Offers", sub: "Seasonal campaigns, here for a short while." },
       featured: { title: "Featured Products", sub: "A closer look at pieces from the collection." },
@@ -276,7 +268,7 @@ export const defaultCms: CmsContent = {
   },
   business: {
     name: site.legalName,
-    address: `${site.address.street}, ${site.address.locality}, ${site.address.city} – ${site.address.postalCode}, ${site.address.region}`,
+    address: addressLine,
     phone: site.contact.phone,
     email: site.contact.email,
     gstin: "",
@@ -450,6 +442,9 @@ export function normaliseCms(raw: unknown): CmsContent {
           note: str(c.note, "", 120),
         })).filter((c) => c.code && c.value > 0 && (c.type === "flat" || c.value <= 100))
       : d.coupons,
+    pairings: normalisePairings(r.pairings),
+    promises: normalisePromises(r.promises),
+    occasions: normaliseOccasions(r.occasions, d.occasions),
     store: {
       ordersOpen: bool(st.ordersOpen, d.store.ordersOpen),
       closedMessage: str(st.closedMessage, d.store.closedMessage, 300) || d.store.closedMessage,
@@ -531,4 +526,51 @@ function normalisePages(raw: unknown): CmsPages {
       story: paras(a.story, d.about.story),
     },
   };
+}
+
+const PRODUCT_ID = /^[\w-]{6,64}$/;
+
+/** Up to 8 matches per product, ids only, no product matched with itself. */
+function normalisePairings(v: unknown): Record<string, string[]> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, string[]> = {};
+  for (const [id, list] of Object.entries(v as Record<string, unknown>).slice(0, 2000)) {
+    if (!PRODUCT_ID.test(id) || !Array.isArray(list)) continue;
+    const ids = [...new Set(list.filter((x): x is string => typeof x === "string" && PRODUCT_ID.test(x) && x !== id))].slice(0, 8);
+    if (ids.length) out[id] = ids;
+  }
+  return out;
+}
+
+/** Occasion cards: unique link slugs, product ids only. Never saved yet = the built-in four. */
+function normaliseOccasions(v: unknown, d: CmsContent["occasions"]): CmsContent["occasions"] {
+  if (!isObj(v) || !Array.isArray(v.items)) return d;
+  const seen = new Set<string>();
+  const items: CmsOccasion[] = [];
+  for (const o of (v.items as unknown[]).filter(isObj).slice(0, 16)) {
+    const oid = slug(str(o.id, "", 60)) || slug(str(o.title, "", 60));
+    if (!oid || seen.has(oid)) continue;
+    seen.add(oid);
+    items.push({
+      id: oid,
+      title: str(o.title, "", 40).trim() || "Occasion",
+      blurb: str(o.blurb, "", 160),
+      image: url(o.image),
+      enabled: bool(o.enabled, true),
+      products: Array.isArray(o.products) ? [...new Set(o.products.filter((x): x is string => typeof x === "string" && PRODUCT_ID.test(x)))].slice(0, MAX_OCCASION_PRODUCTS) : [],
+      autoMatch: bool(o.autoMatch, false),
+    });
+  }
+  return { title: str(v.title, d.title, 60).trim() || d.title, items };
+}
+
+/** Up to 6 short promises per product. An empty list is kept: it means "show none". */
+function normalisePromises(v: unknown): Record<string, string[]> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, string[]> = {};
+  for (const [id, list] of Object.entries(v as Record<string, unknown>).slice(0, 2000)) {
+    if (!PRODUCT_ID.test(id) || !Array.isArray(list)) continue;
+    out[id] = [...new Set(list.filter((x): x is string => typeof x === "string").map((x) => x.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean))].slice(0, 6);
+  }
+  return out;
 }

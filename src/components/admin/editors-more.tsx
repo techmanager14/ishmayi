@@ -60,12 +60,12 @@ export function PagesEditor({ initial }: { initial: CmsContent["pages"] }) {
 
   return (
     <CmsForm patch={patch}>
-      <Panel title="Brand lines" sub="Used on the About page and in the footer.">
+      <Panel title="Brand lines" sub="About page and footer.">
         <Text id="pg-tag" label="Tagline" value={pages.brand.tagline} onChange={(v) => setBrand({ tagline: v })} />
         <Text id="pg-prom" label="Promise" value={pages.brand.promise} onChange={(v) => setBrand({ promise: v })} />
         <Text id="pg-ess" label="Short brand line" area rows={2} value={pages.brand.essence} onChange={(v) => setBrand({ essence: v })} />
       </Panel>
-      <Panel title="Section titles" sub="Title and the short line under it, for each section.">
+      <Panel title="Section titles" sub="Heading and line under it.">
         <div className="grid gap-3 lg:grid-cols-2">
           {HEADING_KEYS.map((k) => (
             <div key={k} className="space-y-2 rounded-xl bg-ivory-deep p-3">
@@ -76,7 +76,7 @@ export function PagesEditor({ initial }: { initial: CmsContent["pages"] }) {
           ))}
         </div>
       </Panel>
-      <Panel title="Brand pillars" sub="The cards on the About page.">
+      <Panel title="Brand pillars" sub="Cards on the About page.">
         <ItemList noun="Pillar" items={pages.pillars} onChange={(fn) => setPages((x) => ({ ...x, pillars: fn(x.pillars) }))} />
       </Panel>
       <Panel title="About page">
@@ -97,7 +97,7 @@ export function NavEditor({ initial }: { initial: CmsContent["nav"] }) {
   const [nav, setNav] = useState(initial);
   return (
     <CmsForm patch={{ nav }}>
-      <Panel title="Main menu" sub="Links in the header menu (phones) and the footer. Shop categories are added automatically.">
+      <Panel title="Main menu" sub="Header and footer links.">
         {nav.map((n, i) => (
           <div key={i} className="grid gap-2 rounded-xl bg-ivory-deep p-3 sm:grid-cols-[1fr_1.4fr_auto] sm:items-center">
             <input aria-label={`Link ${i + 1} label`} value={n.label} onChange={(e) => setNav((x) => x.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)))} className={input} placeholder="Label" />

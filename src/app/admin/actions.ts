@@ -40,7 +40,6 @@ import { sendCustomerEmail } from "@/lib/customer/data";
 import { refundPayment } from "@/lib/payments";
 import { REFUND_PREFIX } from "@/lib/refund-notes";
 import { formatInrExact } from "@/lib/site";
-import { createRateLimiter } from "@/lib/webhook";
 
 export interface ActionState {
   ok: boolean;
@@ -53,14 +52,22 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message.replace(
 
 // ---------- Session ----------
 
-const loginLimiter = createRateLimiter(6, 15 * 60 * 1000);
+// Only wrong passwords count, so signing in normally never locks the admin out.
+const FAILED_LIMIT = 6;
+const FAILED_WINDOW_MS = 15 * 60 * 1000;
+const failedLogins = new Map<string, number[]>();
+const recentFailures = (ip: string) => (failedLogins.get(ip) ?? []).filter((t) => Date.now() - t < FAILED_WINDOW_MS);
 
 export async function loginAction(_: ActionState | undefined, form: FormData): Promise<ActionState> {
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  if (loginLimiter(ip)) return fail("Too many attempts. Please wait 15 minutes and try again.");
+  if (recentFailures(ip).length >= FAILED_LIMIT) return fail("Too many wrong passwords. Please wait 15 minutes and try again.");
   const email = str(form, "email", 200);
-  if (!checkCredentials(email, String(form.get("password") ?? ""))) return fail("Email or password is incorrect.");
+  if (!checkCredentials(email, String(form.get("password") ?? ""))) {
+    failedLogins.set(ip, [...recentFailures(ip), Date.now()]);
+    return fail("Email or password is incorrect.");
+  }
+  failedLogins.delete(ip);
   await startSession(email);
   redirect("/admin");
 }
@@ -122,7 +129,7 @@ export async function claimStatusAction(form: FormData) {
   const ref = str(form, "ref", 20);
   const status = str(form, "status", 30);
   const note = str(form, "note", 500);
-  if (!contactId || !/^TRV-[A-Z0-9]+$/.test(ref) || !CLAIM_STATUSES.includes(status as (typeof CLAIM_STATUSES)[number])) return;
+  if (!contactId || !/^ISH-[A-Z0-9]+$/.test(ref) || !CLAIM_STATUSES.includes(status as (typeof CLAIM_STATUSES)[number])) return;
   await addContactNote(contactId, `${CLAIM_UPDATE_PREFIX} ${ref}: ${status}${note ? ` — ${note}` : ""}`);
   invalidateAdmin();
   revalidatePath("/admin/claims");
@@ -140,7 +147,7 @@ export async function refundAction(_: ActionState | undefined, form: FormData): 
   const method = str(form, "method", 20);
   const note = str(form, "note", 300);
   const amount = Math.round(Number(str(form, "amount", 12).replace(/[₹,\s]/g, "")) * 100) / 100;
-  if (!contactId || !/^TRV-[A-Z0-9]+$/.test(ref)) return fail("This claim could not be read.");
+  if (!contactId || !/^ISH-[A-Z0-9]+$/.test(ref)) return fail("This claim could not be read.");
   if (!(amount > 0)) return fail("Enter the amount to refund.");
   if (form.get("confirm") !== "yes") return fail("Tick the box to confirm the amount.");
 
@@ -271,6 +278,7 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
       const amount = money(str(form, "amount", 20));
       if (!amount) return fail("Enter a price.");
       const newId = await createProduct(input, { amount, compareAtPrice: money(str(form, "compareAtPrice", 20)) });
+      if (form.get("promisesEditable") === "1") await savePromises(newId, form.getAll("promise").map(String));
       refreshStore();
       redirect(`/admin/products/${newId}?saved=1`);
     }
@@ -288,6 +296,8 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
         availableQuantity: track ? Math.max(0, Math.floor(Number(form.getAll("priceQty")[i] ?? 0) || 0)) : null,
       });
     }
+    if (form.get("pairingsEditable") === "1") await savePairings(id, form.getAll("pairWith").map(String));
+    if (form.get("promisesEditable") === "1") await savePromises(id, form.getAll("promise").map(String));
   } catch (err) {
     if (err && typeof err === "object" && "digest" in err) throw err; // redirect()
     return fail(errorText(err));
@@ -296,6 +306,28 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
   invalidateAdmin();
   revalidatePath("/admin", "layout");
   return { ok: true, message: "Saved. The website updates within a few seconds." };
+}
+
+/** The promises shown on this product's page (an empty list hides the row). */
+async function savePromises(id: string, chosen: string[]) {
+  const cms = await getCmsFresh();
+  await saveCms(normaliseCms({ ...cms, promises: { ...cms.promises, [id]: chosen } }));
+  updateTag(CMS_TAG);
+}
+
+/** Perfect match is two-way: ticking B on A also lists A on B, and unticking removes both. */
+async function savePairings(id: string, chosen: string[]) {
+  const picked = [...new Set(chosen.filter((x) => /^[\w-]{6,64}$/.test(x) && x !== id))].slice(0, 8);
+  const cms = await getCmsFresh();
+  const pairings: Record<string, string[]> = { ...cms.pairings, [id]: picked };
+  for (const [other, list] of Object.entries(pairings)) {
+    if (other === id) continue;
+    if (picked.includes(other) && !list.includes(id)) pairings[other] = [...list, id].slice(0, 8);
+    if (!picked.includes(other) && list.includes(id)) pairings[other] = list.filter((x) => x !== id);
+  }
+  for (const other of picked) if (!pairings[other]) pairings[other] = [id];
+  await saveCms(normaliseCms({ ...cms, pairings }));
+  updateTag(CMS_TAG);
 }
 
 export async function deleteProductAction(form: FormData) {
@@ -317,7 +349,7 @@ export async function saveCmsAction(_: ActionState | undefined, form: FormData):
   } catch {
     return fail("The changes couldn't be read. Please reload and try again.");
   }
-  const allowed: (keyof CmsContent)[] = ["announcement", "banners", "videos", "categories", "sections", "contact", "faqs", "reviews", "coupons", "pages", "nav", "policies", "store", "business", "seo", "social"];
+  const allowed: (keyof CmsContent)[] = ["announcement", "banners", "videos", "categories", "sections", "contact", "faqs", "reviews", "coupons", "pairings", "occasions", "pages", "nav", "policies", "store", "business", "seo", "social"];
   const keys = Object.keys(patch).filter((k): k is keyof CmsContent => (allowed as string[]).includes(k));
   if (!keys.length) return fail("Nothing to save.");
   try {

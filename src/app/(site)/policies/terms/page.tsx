@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PolicyPage } from "@/components/PolicyPage";
-import { site } from "@/lib/site";
+import { operatedBy, site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -14,7 +14,7 @@ export default function TermsPage() {
     <PolicyPage policy="terms" title="Terms of Use" intro="The terms that apply when you use this website and order from us.">
       <h2>About these terms</h2>
       <p>
-        {site.name} is operated by {site.legalName}. By using this website or placing an order, you agree to these terms.
+        {operatedBy ? `${site.name} is operated by ${operatedBy}. ` : ""}By using this website or placing an order, you agree to these terms.
       </p>
 
       <h2>Orders</h2>
@@ -52,7 +52,7 @@ export default function TermsPage() {
       </p>
 
       <h2>Governing law</h2>
-      <p>These terms are governed by the laws of India, and the courts of Mumbai have jurisdiction.</p>
+      <p>These terms are governed by the laws of India, and {site.address.city ? `the courts of ${site.address.city} have jurisdiction.` : "the courts of India have jurisdiction."}</p>
     </PolicyPage>
   );
 }

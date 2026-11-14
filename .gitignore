@@ -13,3 +13,6 @@ next-env.d.ts
 # Personal Claude Code settings
 /.claude/settings.local.json
 /video_*.mp4
+
+.vercel
+.env*

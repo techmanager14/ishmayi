@@ -20,8 +20,11 @@ function Row({ items }: { items: QuickNavItem[] }) {
         return (
           <li key={c.slug} className="shrink-0">
             <Link href={c.href} aria-current={active ? "page" : undefined} className="group flex w-[5.25rem] flex-col items-center gap-2 md:w-36">
-              <span className={`relative block h-[5.25rem] w-[5.25rem] overflow-hidden rounded-[1.25rem] ring-offset-2 transition-shadow md:h-36 md:w-36 md:rounded-[2rem] ${active ? "ring-2 ring-burgundy" : "group-hover:ring-2 group-hover:ring-gold"}`}>
-                <span className="absolute inset-0 block">{c.art}</span>
+              {/* Gold border with a thin gap around the photo; maroon for the category being viewed. */}
+              <span className={`block h-[5.25rem] w-[5.25rem] rounded-full border-2 p-[3px] transition-colors md:h-36 md:w-36 md:p-1 ${active ? "border-burgundy" : "border-gold-light group-hover:border-gold"}`}>
+                <span className="relative block h-full w-full overflow-hidden rounded-full">
+                  <span className="absolute inset-0 block">{c.art}</span>
+                </span>
               </span>
               <span className={`text-center text-[0.78rem] leading-tight md:text-[1.05rem] ${active ? "font-bold text-burgundy" : "text-charcoal"}`}>{c.title}</span>
             </Link>

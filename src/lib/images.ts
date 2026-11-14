@@ -4,7 +4,7 @@
 
 /** Widths the optimiser allows (next.config.ts deviceSizes + imageSizes). */
 const ALLOWED = [96, 160, 240, 320, 400, 480, 640, 828, 1080, 1280, 1920];
-const OPTIMISED_HOSTS = ["assets.cdn.filesafe.space", "storage.googleapis.com"];
+const OPTIMISED_HOSTS = ["assets.cdn.filesafe.space", "files.leadconnectorhq.com", "storage.googleapis.com"];
 
 const host = (src: string) => {
   try {

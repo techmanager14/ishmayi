@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
   images: {
     // GoHighLevel media storage (product photos, banners) is resized by Next's
     // image optimiser — originals are often 1–2 MB PNGs.
-    remotePatterns: [new URL("https://assets.cdn.filesafe.space/**"), new URL("https://storage.googleapis.com/msgsndr/**")],
+    remotePatterns: [new URL("https://assets.cdn.filesafe.space/**"), new URL("https://files.leadconnectorhq.com/**"), new URL("https://storage.googleapis.com/msgsndr/**")],
     deviceSizes: [480, 640, 828, 1080, 1280, 1920],
     imageSizes: [96, 160, 240, 320, 400],
     qualities: [70, 80, 90],

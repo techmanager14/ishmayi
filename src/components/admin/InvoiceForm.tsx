@@ -47,7 +47,7 @@ export function InvoiceForm({
               <label className={label} htmlFor="name">
                 Invoice name
               </label>
-              <input id="name" name="name" defaultValue={initial.name} className={input} placeholder="e.g. Order TRV-ABC123" />
+              <input id="name" name="name" defaultValue={initial.name} className={input} placeholder="e.g. Order ISH-ABC123" />
             </div>
           </div>
         </section>
@@ -70,7 +70,7 @@ export function InvoiceForm({
                   <label className="mb-1 block text-xs font-semibold">Price ₹ (each)</label>
                   <input inputMode="decimal" value={it.amount || ""} onChange={(e) => upd(i, { amount: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} className={input} />
                 </div>
-                <button type="button" onClick={() => setItems(items.filter((_, j) => j !== i))} disabled={items.length === 1} className={`${btn.ghost} text-rose-300 disabled:opacity-30`}>
+                <button type="button" onClick={() => setItems(items.filter((_, j) => j !== i))} disabled={items.length === 1} className={`${btn.ghost} text-rose-800 disabled:opacity-30`}>
                   Remove
                 </button>
               </li>
@@ -111,7 +111,7 @@ export function InvoiceForm({
           <p className="mt-1 text-xs text-ink-muted">Enter prices without GST; add GST as its own line (3% jewellery, HSN 7117 · 18% consultation, SAC 999799).</p>
         </div>
         <label className="flex items-center gap-3 text-sm font-semibold">
-          <input type="checkbox" name="send" value="yes" defaultChecked className="h-5 w-5 accent-[#e3425c]" />
+          <input type="checkbox" name="send" value="yes" defaultChecked className="h-5 w-5 accent-[#5e0f2c]" />
           Email it to the customer now
         </label>
         <Submit className={`${btn.primary} w-full py-3`} pendingText="Creating…">

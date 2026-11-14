@@ -4,8 +4,8 @@ import { checkoutAllowed } from "@/lib/catalog";
 import { SUBMISSION_ID_PATTERN } from "@/lib/enquiry";
 import { validateCheckout } from "@/lib/order";
 import { recordOrder } from "@/lib/orders";
-import { orderRef, quoteOrder, type PendingOrder } from "@/lib/payments";
-import { formatInr, site } from "@/lib/site";
+import { codOffered, orderRef, quoteOrder, type PendingOrder } from "@/lib/payments";
+import { formatInr } from "@/lib/site";
 import { clientIp, createRateLimiter, sameOrigin } from "@/lib/webhook";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ const placed = new Map<string, { at: number; ref: string; total: number }>();
 // NEXT_PUBLIC_ALLOW_COD=false / COD_MAX_AMOUNT in the environment still override.
 const codSettings = async () => {
   const { store } = await getCmsFresh();
-  return { enabled: site.codEnabled && store.codEnabled, max: Number(process.env.COD_MAX_AMOUNT) || store.codMaxAmount || 25000 };
+  return { enabled: codOffered(store), max: Number(process.env.COD_MAX_AMOUNT) || store.codMaxAmount || 25000 };
 };
 
 const fail = (status: number, code: string, message: string, extra: object = {}) =>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Art } from "@/components/Art";
 import { PageHero, SectionHeading } from "@/components/Sections";
 import { getCms } from "@/lib/cms";
-import { site } from "@/lib/site";
+import { addressLine, operatedBy, site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "About",
@@ -55,12 +55,8 @@ export default async function AboutPage() {
         <div className="grid gap-8 md:grid-cols-2 md:items-center md:gap-16">
           <div>
             <p className="eyebrow">The business</p>
-            <p className="mt-2 font-display text-[1.3rem] leading-tight text-charcoal">
-              {site.name} is operated by {site.legalName}.
-            </p>
-            <p className="mt-2 text-ink-muted">
-              Registered office: {site.address.street}, {site.address.locality}, {site.address.city} – {site.address.postalCode}
-            </p>
+            <p className="mt-2 font-display text-[1.3rem] leading-tight text-charcoal">{operatedBy ? `${site.name} is operated by ${operatedBy}.` : `${site.name}: ${site.tagline}.`}</p>
+            {addressLine && <p className="mt-2 text-ink-muted">Registered office: {addressLine}</p>}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row md:justify-end">
             <Link href="/shop" className="btn btn-primary">Shop the collection</Link>

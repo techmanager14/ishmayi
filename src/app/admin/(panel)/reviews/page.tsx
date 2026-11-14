@@ -10,7 +10,7 @@ export default async function ReviewsPage() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Reviews" sub="Video and written reviews on the home page — add, edit, reorder or hide them." />
+      <PageTitle title="Reviews" sub="Customer reviews." />
       <ReviewsEditor initial={c.reviews} />
     </>
   );

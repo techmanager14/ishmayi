@@ -70,7 +70,7 @@ export interface CustomerOrder {
 export interface CustomerInvoice {
   id: string;
   number: string;
-  /** e.g. "Order TRV-ABC123" when raised for a website order. */
+  /** e.g. "Order ISH-ABC123" when raised for a website order. */
   name: string;
   status: string;
   total: number;
@@ -88,7 +88,7 @@ export async function contactForEmail(email: string, name: string, create = true
   const c = res.contacts?.[0];
   if (c) return { id: c.id, name: [c.firstNameRaw, c.lastNameRaw].filter(Boolean).join(" ") || c.contactName || name };
   if (!create) return null;
-  const id = await upsertContact({ fullName: name || email.split("@")[0], email, source: "Trivana website — account" });
+  const id = await upsertContact({ fullName: name || email.split("@")[0], email, source: "Ishmayi website — account" });
   await ghlApi("POST", `/contacts/${id}/tags`, { body: { tags: ["website-account"] } }).catch(() => {});
   return { id, name };
 }
@@ -141,7 +141,7 @@ const STEP_LABELS = ["Order placed", "Confirmed", "Shipped", "Delivered"];
 function parseOrder(o: RawOpp, notes: RawNote[], stageName: string | null, ordersPipeline: boolean): CustomerOrder {
   const name = o.name ?? "";
   const kind: "order" | "consultation" = name.startsWith("🔮") ? "consultation" : "order";
-  const reference = name.match(/TRV-[A-Z0-9]+/)?.[0] ?? "";
+  const reference = name.match(/ISH-[A-Z0-9]+/)?.[0] ?? "";
   // Orders: the note carrying the order number. Consultations: the enquiry note written closest to the card.
   const created = Date.parse(o.createdAt ?? "") || 0;
   const note = reference
@@ -274,7 +274,7 @@ export async function trackOrder(reference: string, phone: string): Promise<Cust
 /** An order (and its customer) by order number + the phone used at checkout. */
 export async function findOrder(reference: string, phone: string): Promise<{ order: CustomerOrder; contactId: string; name: string } | null> {
   const ref = reference.trim().toUpperCase().replace(/\s+/g, "");
-  if (!/^TRV-[A-Z0-9]{4,12}$/.test(ref)) return null;
+  if (!/^ISH-[A-Z0-9]{4,12}$/.test(ref)) return null;
   const res = await ghlApi<{ opportunities?: (RawOpp & { contactId?: string; contact?: { id?: string; phone?: string; name?: string } })[] }>("GET", "/opportunities/search", {
     query: { location_id: locationId(), q: ref, limit: 5 },
   });

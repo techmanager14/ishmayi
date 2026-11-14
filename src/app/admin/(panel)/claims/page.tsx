@@ -9,11 +9,11 @@ import { formatInrExact } from "@/lib/site";
 export const metadata = { title: "Damage claims" };
 
 const TONE: Record<Claim["status"], string> = {
-  New: "bg-amber-500/15 text-amber-300",
-  "Refund approved": "bg-sky-500/15 text-sky-300",
-  "Partially refunded": "bg-violet-500/15 text-violet-300",
-  Refunded: "bg-emerald-500/15 text-emerald-300",
-  Rejected: "bg-rose-500/15 text-rose-300",
+  New: "bg-amber-500/15 text-amber-800",
+  "Refund approved": "bg-sky-500/15 text-sky-800",
+  "Partially refunded": "bg-violet-500/15 text-violet-800",
+  Refunded: "bg-emerald-500/15 text-emerald-800",
+  Rejected: "bg-rose-500/15 text-rose-800",
 };
 
 export default async function ClaimsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
@@ -71,7 +71,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                       <dt className="w-24 shrink-0 text-ink-muted">Customer</dt>
                       <dd className="min-w-0">
                         {c.contact.phone && (
-                          <a href={`https://wa.me/${c.contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-[#ff8197] hover:underline">
+                          <a href={`https://wa.me/${c.contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-burgundy hover:underline">
                             {c.contact.phone} · WhatsApp
                           </a>
                         )}

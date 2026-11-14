@@ -56,7 +56,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 {rows.map((c) => (
                   <tr key={c.id} className="hover:bg-ivory-deep/60">
                     <td className="px-5 py-3">
-                      <Link href={`/admin/customers/${c.id}`} className="font-bold text-[#ff8197] hover:underline">
+                      <Link href={`/admin/customers/${c.id}`} className="font-bold text-burgundy hover:underline">
                         {c.name || "—"}
                       </Link>
                       {c.city && <span className="block text-xs text-ink-muted">{c.city}</span>}

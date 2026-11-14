@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Photo } from "@/components/Art";
 import { ProductCard } from "@/components/ProductCard";
 import { PageHero, SectionHeading } from "@/components/Sections";
 import { setsShelf, shelfHref } from "@/data/shelves";
@@ -34,9 +35,15 @@ export default async function GiftingPage() {
         <ul className="mt-6 grid grid-cols-3 gap-2.5 md:gap-5">
           {BUDGETS.map((b) => (
             <li key={b}>
-              <Link href={`/shop?max=${b}`} className="flex flex-col items-center justify-center rounded-2xl bg-burgundy px-2 py-5 text-center text-white transition-colors hover:bg-burgundy-deep md:py-9">
-                <span className="text-[0.85rem] md:text-[1.1rem]">Under</span>
-                <span className="text-[1.25rem] font-bold md:text-[2.25rem]">{formatInr(b)}</span>
+              <Link href={`/shop?max=${b}`} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl">
+                <span className="absolute inset-0 block transition-transform duration-700 group-hover:scale-[1.05]">
+                  <Photo src={`/tiles/budget-${b}.jpg`} alt="" sizes="(min-width: 768px) 30vw, 33vw" />
+                </span>
+                <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-burgundy-deep/90 via-burgundy-deep/35 to-transparent" />
+                <span className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-2 text-white md:pb-5">
+                  <span className="text-[0.72rem] md:text-[1rem]">Under</span>
+                  <span className="text-[1.1rem] leading-tight font-bold md:text-[2rem]">{formatInr(b)}</span>
+                </span>
               </Link>
             </li>
           ))}

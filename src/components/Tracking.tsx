@@ -42,8 +42,8 @@ export function AnalyticsConsent() {
   useEffect(() => {
     setConsent(readConsent());
     const onChange = (e: Event) => setConsent((e as CustomEvent<Consent>).detail);
-    window.addEventListener("trivana:consent", onChange);
-    return () => window.removeEventListener("trivana:consent", onChange);
+    window.addEventListener("ishmayi:consent", onChange);
+    return () => window.removeEventListener("ishmayi:consent", onChange);
   }, []);
 
   if (!site.gaId) return null;
@@ -94,11 +94,11 @@ export function CookieSettingsButton() {
       className="transition-colors hover:text-white"
       onClick={() => {
         try {
-          window.localStorage.removeItem("trivana-analytics-consent");
+          window.localStorage.removeItem("ishmayi-analytics-consent");
         } catch {
           /* ignore */
         }
-        window.dispatchEvent(new CustomEvent("trivana:consent", { detail: null }));
+        window.dispatchEvent(new CustomEvent("ishmayi:consent", { detail: null }));
       }}
     >
       Cookie settings

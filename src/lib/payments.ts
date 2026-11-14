@@ -6,6 +6,7 @@ import { getCmsFresh } from "./cms";
 import { rewardsForContact, type RewardKind } from "./customer/rewards";
 import type { Attribution } from "./enquiry";
 import type { CheckoutCustomer, CheckoutLineInput, PricedLine } from "./order";
+import { site } from "./site";
 
 // Razorpay (https://razorpay.com/docs/api/orders/) — payment happens in
 // Razorpay's checkout popup on our own page. Keys stay on the server, except
@@ -15,6 +16,9 @@ const env = (k: string) => process.env[k]?.trim() ?? "";
 
 export const razorpayConfigured = () => Boolean(env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET"));
 export const razorpayKeyId = () => env("RAZORPAY_KEY_ID");
+
+/** Cash on Delivery at checkout: when the admin turns it on, and always while online payment isn't set up. */
+export const codOffered = (store: { codEnabled: boolean }) => site.codEnabled && (store.codEnabled || !razorpayConfigured());
 
 const tokenSecret = () => env("ORDER_TOKEN_SECRET") || env("RAZORPAY_KEY_SECRET");
 
@@ -277,11 +281,11 @@ export function readOrder(token: unknown): PendingOrder | null {
   }
 }
 
-/** Short, readable order reference, e.g. TRV-K3M9Q2. */
+/** Short, readable order reference, e.g. ISH-K3M9Q2. */
 export function orderRef() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   for (const b of bytes) s += alphabet[b % alphabet.length];
-  return `TRV-${s}`;
+  return `ISH-${s}`;
 }

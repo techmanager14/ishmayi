@@ -58,8 +58,8 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
       <PageTitle
         title="New invoice"
         sub={
-          <Link href="/admin/invoices" className="font-semibold text-[#ff8197] hover:underline">
-            ← Invoices
+          <Link href="/admin/invoices" className="font-semibold text-burgundy hover:underline">
+            Invoices
           </Link>
         }
       />

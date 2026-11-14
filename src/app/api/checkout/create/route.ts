@@ -29,10 +29,9 @@ export async function POST(req: NextRequest) {
     return fail(400, "malformed", "The order could not be read. Please try again.");
   }
 
-  // An account is required: the order is placed under the signed-in customer's email.
+  // Signed in: the order goes on the account's email. Guests give their own email.
   const me = await currentCustomer();
-  if (!me) return fail(401, "login_required", "Please sign in or create an account to place your order.");
-  const customer = validateCheckout({ ...(body.customer ?? {}), email: me.email });
+  const customer = validateCheckout(me ? { ...(body.customer ?? {}), email: me.email } : (body.customer ?? {}));
   if (!customer.ok) return fail(422, "invalid", "Please check the highlighted fields.", { fieldErrors: customer.errors });
 
   if (!(await checkoutAllowed())) return fail(503, "store_not_live", "Online ordering opens soon. Please contact us to place your order.");
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
     return fail(503, "payments_not_configured", "Online payments are being set up. Please contact us to place your order.");
   }
 
-  const priced = await quoteOrder(body.lines, body.coupon, me.contactId);
+  const priced = await quoteOrder(body.lines, body.coupon, me?.contactId);
   if (!priced.ok) return fail(priced.code === "store_closed" ? 503 : 409, priced.code, priced.message, { productId: priced.productId });
   if (priced.couponError) return fail(422, "coupon_invalid", priced.couponError);
 
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
     ref,
     razorpayOrderId: rzp.id,
     createdAt: new Date().toISOString(),
-    accountContactId: me.contactId,
+    accountContactId: me?.contactId,
     customer: c,
     lines: priced.lines,
     subtotal: priced.subtotal,

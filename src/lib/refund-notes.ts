@@ -1,5 +1,5 @@
 // Refunds are recorded as notes on the customer's GoHighLevel contact, e.g.
-//   💸 Refund TRV-ABC123: ₹500 of ₹3,397.97 — Razorpay rfnd_xyz — clasp broken
+//   💸 Refund ISH-ABC123: ₹500 of ₹3,397.97 — Razorpay rfnd_xyz — clasp broken
 // so the original order amount and the refunded amount stay separate.
 
 export const REFUND_PREFIX = "💸 Refund";

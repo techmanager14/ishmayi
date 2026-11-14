@@ -10,7 +10,7 @@ export default async function ContentPage() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Content & FAQs" sub="Announcement bar and FAQs. Changes go live as soon as you save." />
+      <PageTitle title="Content & FAQs" sub="Announcement bar and FAQs." />
       <ContentEditor initial={{ announcement: c.announcement, faqs: c.faqs }} />
     </>
   );

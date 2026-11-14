@@ -23,8 +23,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <PageTitle
         title={contact.name || contact.email}
         sub={
-          <Link href="/admin/customers" className="font-semibold text-[#ff8197] hover:underline">
-            ← Customers
+          <Link href="/admin/customers" className="font-semibold text-burgundy hover:underline">
+            Customers
           </Link>
         }
       />
@@ -75,11 +75,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <dd className="font-semibold">
                 {contact.phone ? (
                   <>
-                    <a href={`tel:${contact.phone}`} className="text-[#ff8197] hover:underline">
+                    <a href={`tel:${contact.phone}`} className="text-burgundy hover:underline">
                       {contact.phone}
                     </a>{" "}
                     ·{" "}
-                    <a href={`https://wa.me/${contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-[#ff8197] hover:underline">
+                    <a href={`https://wa.me/${contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-burgundy hover:underline">
                       WhatsApp
                     </a>
                   </>
@@ -92,7 +92,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <dt className="text-ink-muted">Email</dt>
               <dd className="font-semibold">
                 {contact.email ? (
-                  <a href={`mailto:${contact.email}`} className="text-[#ff8197] hover:underline">
+                  <a href={`mailto:${contact.email}`} className="text-burgundy hover:underline">
                     {contact.email}
                   </a>
                 ) : (

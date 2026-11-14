@@ -24,7 +24,7 @@ export function TrackForm() {
           <label htmlFor="trk-order" className="field-label">
             Order number
           </label>
-          <input id="trk-order" name="order" required placeholder="TRV-ABC123" autoComplete="off" className="field-input uppercase" />
+          <input id="trk-order" name="order" required placeholder="ISH-ABC123" autoComplete="off" className="field-input uppercase" />
         </div>
         <div>
           <label htmlFor="trk-phone" className="field-label">

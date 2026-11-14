@@ -1,16 +1,17 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 
 const INTERVAL_MS = 6000;
 const SWIPE_PX = 40;
 
-/** Promotional slider: cross-fades, autoplays, swipes on touch and has arrows, dots and pause. */
+/** Promotional slider: cross-fades, autoplays (pausing on hover or focus), swipes on touch and has arrows and dots. */
 export function HeroSlider({ children, labels }: { children: ReactNode; labels: string[] }) {
   const slides = Children.toArray(children);
   const [index, setIndex] = useState(0);
   const [hovering, setHovering] = useState(false);
+  // Stays still for visitors who ask their device to reduce motion.
   const [stopped, setStopped] = useState(false);
   const startX = useRef<number | null>(null);
   const swiped = useRef(false);
@@ -89,9 +90,6 @@ export function HeroSlider({ children, labels }: { children: ReactNode; labels: 
                 <span className={`block h-2 rounded-full transition-all ${i === index ? "w-10 bg-burgundy" : "w-2 bg-charcoal/25 group-hover:bg-charcoal/50"}`} />
               </button>
             ))}
-            <button type="button" onClick={() => setStopped((s) => !s)} aria-label={stopped ? "Play banners" : "Pause banners"} className="ml-1 flex h-8 w-8 items-center justify-center text-ink-muted hover:text-charcoal">
-              {stopped ? <Play className="h-3 w-3" aria-hidden="true" /> : <Pause className="h-3 w-3" aria-hidden="true" />}
-            </button>
           </div>
         </>
       )}

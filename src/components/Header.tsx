@@ -159,7 +159,7 @@ export function Header({ tiles, reviews }: { tiles: MenuTile[]; reviews: MenuRev
           <div className="-mr-2 ml-auto flex items-center lg:ml-0">
             <AccountMenu className={headerIcon} />
             <WishlistLink />
-            <CartButton className={headerIcon} />
+            <CartButton className={headerIcon} flyTarget />
           </div>
         </div>
       </header>

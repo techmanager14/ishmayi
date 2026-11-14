@@ -116,7 +116,7 @@ export async function trackAction(_: { order?: CustomerOrder; message?: string }
   const phone = str(form, "phone", 20);
   try {
     const order = await trackOrder(reference, phone);
-    if (!order) return { message: "We couldn't find an order with that number and phone. Check both — the order number looks like TRV-ABC123." };
+    if (!order) return { message: "We couldn't find an order with that number and phone. Check both — the order number looks like ISH-ABC123." };
     return { order };
   } catch {
     return { message: "We couldn't look that up just now. Please try again in a minute." };

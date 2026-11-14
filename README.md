@@ -1,6 +1,6 @@
 # Ishmayi
 
-Website and online store for Ishmayi: premium adornments and heritage, operated by Trivana Creations LLP.
+Website and online store for Ishmayi: premium adornments and heritage.
 
 **Stack:** Next.js 16 (App Router), React 19, Tailwind CSS 4, TypeScript. Products, orders, customers and site content are stored in GoHighLevel. Payments go through Razorpay.
 

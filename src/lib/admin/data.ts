@@ -24,7 +24,7 @@ export interface Opportunity {
   createdAt: string;
   updatedAt: string;
   contact: { id: string; name: string; email: string; phone: string };
-  /** TRV-XXXXXX for orders. */
+  /** ISH-XXXXXX for orders. */
   reference: string | null;
   /** "COD" / "Paid" for orders; plan name for consultations. */
   detail: string;
@@ -60,7 +60,7 @@ function mapOpp(o: RawOpp): Opportunity {
     createdAt: o.createdAt ?? "",
     updatedAt: o.updatedAt ?? o.createdAt ?? "",
     contact: { id: o.contact?.id ?? o.contactId ?? "", name: o.contact?.name ?? "", email: o.contact?.email ?? "", phone: o.contact?.phone ?? "" },
-    reference: name.match(/TRV-[A-Z0-9]+/)?.[0] ?? null,
+    reference: name.match(/ISH-[A-Z0-9]+/)?.[0] ?? null,
     detail: kind === "order" ? (parts[1] ?? "") : kind === "consultation" ? (parts[0] ?? "") : "",
   };
 }

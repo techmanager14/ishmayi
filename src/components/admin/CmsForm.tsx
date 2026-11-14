@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { saveCmsAction } from "@/app/admin/actions";
@@ -51,11 +52,11 @@ export function CmsForm({ patch, children }: { patch: Record<string, unknown>; c
     <form action={action} className="space-y-4 pb-4">
       <input type="hidden" name="patch" value={json} />
       {children}
-      <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-3 border-t border-parchment bg-panel/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      <div className="sticky bottom-0 z-20 -mx-3 flex flex-wrap items-center gap-3 border-t border-parchment bg-panel/95 px-3 py-2.5 backdrop-blur md:-mx-6 md:px-6">
         <SaveButton dirty={dirty} />
-        {dirty && <span className="text-sm font-semibold text-amber-300">You have unsaved changes</span>}
+        {dirty && <span className="text-sm font-semibold text-amber-800">You have unsaved changes</span>}
         {state?.message && !dirty && (
-          <span role={state.ok ? "status" : "alert"} className={`text-sm font-semibold ${state.ok ? "text-emerald-300" : "text-rose-300"}`}>
+          <span role={state.ok ? "status" : "alert"} className={`text-sm font-semibold ${state.ok ? "text-emerald-800" : "text-rose-800"}`}>
             {state.ok ? "✓ " : "⚠ "}
             {state.message}
           </span>
@@ -65,18 +66,26 @@ export function CmsForm({ patch, children }: { patch: Record<string, unknown>; c
   );
 }
 
-export function Panel({ title, sub, children, actions }: { title: string; sub?: string; children: ReactNode; actions?: ReactNode }) {
+/**
+ * One editor section. Closed by default so long pages read as a short list of headings;
+ * click a heading to open it. Pass open for sections people change most.
+ */
+export function Panel({ title, sub, children, actions, open = false }: { title: string; sub?: string; children: ReactNode; actions?: ReactNode; open?: boolean }) {
   return (
-    <section className="rounded-2xl border border-parchment bg-panel p-5 shadow-[var(--shadow-soft)]">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-base font-bold">{title}</h2>
-          {sub && <p className="mt-0.5 text-xs text-ink-muted">{sub}</p>}
-        </div>
-        {actions}
-      </div>
-      <div className="mt-4 space-y-3">{children}</div>
-    </section>
+    <details open={open} className="group/panel rounded-2xl border border-parchment bg-panel shadow-[var(--shadow-soft)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 hover:bg-ivory-deep/60 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-[0.95rem] font-bold">{title}</span>
+          {sub && <span className="mt-0.5 block text-xs text-ink-muted">{sub}</span>}
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          {/* Buttons in the heading work without opening or closing the section. */}
+          {actions && <span onClick={(e) => e.preventDefault()}>{actions}</span>}
+          <ChevronDown className="h-5 w-5 text-ink-muted transition-transform group-open/panel:rotate-180" aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="space-y-3 border-t border-parchment px-4 pt-3 pb-4">{children}</div>
+    </details>
   );
 }
 
@@ -119,7 +128,7 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
     <label className="flex cursor-pointer items-start gap-3">
       <span className="relative mt-0.5 inline-flex shrink-0">
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-        <span className="h-6 w-11 rounded-full bg-white/15 transition peer-checked:bg-[#e3425c] peer-focus-visible:ring-2 peer-focus-visible:ring-[#e3425c]/50" />
+        <span className="h-6 w-11 rounded-full bg-parchment transition peer-checked:bg-[#5e0f2c] peer-focus-visible:ring-2 peer-focus-visible:ring-[#5e0f2c]/50" />
         <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
       </span>
       <span>
@@ -145,7 +154,7 @@ export function ListControls({ index, length, onMove, onRemove, removeLabel = "R
         onClick={() => {
           if (window.confirm("Remove this item?")) onRemove();
         }}
-        className={`${btn.ghost} text-rose-300 hover:text-rose-200`}
+        className={`${btn.ghost} text-rose-800 hover:text-rose-800`}
       >
         {removeLabel}
       </button>

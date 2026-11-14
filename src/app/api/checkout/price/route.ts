@@ -2,8 +2,7 @@ import { getCms } from "@/lib/cms";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkoutAllowed } from "@/lib/catalog";
 import { currentCustomer } from "@/lib/customer/session";
-import { quoteOrder, razorpayConfigured } from "@/lib/payments";
-import { site } from "@/lib/site";
+import { codOffered, quoteOrder, razorpayConfigured } from "@/lib/payments";
 import { clientIp, createRateLimiter, sameOrigin } from "@/lib/webhook";
 
 export const runtime = "nodejs";
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
   const me = await currentCustomer();
   const priced = await quoteOrder(body?.lines, body?.coupon, me?.contactId);
   return NextResponse.json(
-    { ...priced, payments: (await checkoutAllowed()) && razorpayConfigured(), cod: (await checkoutAllowed()) && site.codEnabled && (await getCms()).store.codEnabled },
+    { ...priced, payments: (await checkoutAllowed()) && razorpayConfigured(), cod: (await checkoutAllowed()) && codOffered((await getCms()).store) },
     { status: priced.ok ? 200 : 409, headers: { "Cache-Control": "no-store" } },
   );
 }

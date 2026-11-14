@@ -26,15 +26,15 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         title={inv.number}
         sub={
           <>
-            <Link href="/admin/invoices" className="font-semibold text-[#ff8197] hover:underline">
-              ← Invoices
+            <Link href="/admin/invoices" className="font-semibold text-burgundy hover:underline">
+              Invoices
             </Link>{" "}
             · {inv.name}
           </>
         }
         actions={<Badge status={inv.status} />}
       />
-      {created && <p className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-300">Invoice created{inv.status !== "draft" ? " and emailed to the customer" : ""}.</p>}
+      {created && <p className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-800">Invoice created{inv.status !== "draft" ? " and emailed to the customer" : ""}.</p>}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
         <InvoiceSheet inv={inv} business={cms.business} />

@@ -1,6 +1,6 @@
 // Which store collections the site shows. Only products in the "on sale"
 // collections are listed or can be bought — everything else in the GoHighLevel
-// store (malas, rings, older stock…) stays hidden.
+// store stays hidden.
 
 export interface Category {
   /** Collection handle (matched to a GoHighLevel store collection by slug or name). */
@@ -15,15 +15,14 @@ export const catalogue = {
   allHandle: "all",
   /** On sale now — add products to these collections in GHL and they appear here. */
   categories: [
-    { handle: "necklaces", label: "Necklaces", blurb: "Including 12 unique necklaces, one for each zodiac sign." },
-    { handle: "pyrite-anklets", label: "Pyrite Anklets", blurb: "Natural pyrite anklets, made to wear every day." },
-    { handle: "fashion-jewellery", label: "Fashion Jewellery", blurb: "Necklaces, bangles, earrings and more — contemporary designs." },
+    { handle: "bracelets", label: "Bracelets", blurb: "Bracelets, bangles and kadas." },
+    { handle: "earrings", label: "Earrings", blurb: "Studs, drops and jhumkas." },
+    { handle: "pendants", label: "Pendants", blurb: "Pendants to wear close." },
+    { handle: "necklaces", label: "Necklaces", blurb: "Necklaces and necklace sets." },
+    { handle: "rings", label: "Rings", blurb: "Rings for every day and every occasion." },
   ] satisfies Category[],
   /** Announced, not on sale yet. Check the GHL collection holds only the new range before moving one to categories. */
-  comingSoon: [
-    { handle: "pendants", label: "Pendants", blurb: "Our pendant collection is on its way." },
-    { handle: "bracelets", label: "Bracelets", blurb: "Our bracelet collection is on its way." },
-  ] satisfies Category[],
+  comingSoon: [{ handle: "hasli", label: "Hasli", blurb: "Traditional collar necklaces, coming soon." }] satisfies Category[],
   /** Legacy store setting, kept so saved content stays valid. */
   zodiacHandle: "necklaces",
 };

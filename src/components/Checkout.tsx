@@ -7,7 +7,6 @@ import { cart, cartSubtotal, useCart, type CartLine } from "@/lib/cart";
 import { thumbUrl } from "@/lib/images";
 import { INDIAN_STATES, emptyCheckout, validateCheckout, type CheckoutErrors, type CheckoutInput, type PricedLine } from "@/lib/order";
 import { formatInr, formatInrExact, site } from "@/lib/site";
-import { waLink } from "@/lib/cms-types";
 import { useCms } from "./CmsProvider";
 import { ContactLinksInline } from "./ContactLinksInline";
 import { loadRazorpay } from "@/lib/razorpay-browser";
@@ -26,7 +25,7 @@ type Priced = {
   total: number;
 };
 
-const FIELD_ORDER: (keyof CheckoutInput)[] = ["fullName", "phone", "giftRecipient", "giftPhone", "address1", "city", "state", "pincode", "privacyNoticeAccepted"];
+const FIELD_ORDER: (keyof CheckoutInput)[] = ["fullName", "phone", "email", "giftRecipient", "giftPhone", "address1", "city", "state", "pincode", "privacyNoticeAccepted"];
 
 /** The signed-in customer's saved details. */
 export interface CheckoutProfile {
@@ -58,7 +57,7 @@ function Section({ n, title, children }: { n: number; title: string; children: R
   );
 }
 
-export function Checkout({ profile }: { profile: CheckoutProfile }) {
+export function Checkout({ profile, guest = false }: { profile: CheckoutProfile; guest?: boolean }) {
   const cms = useCms();
   const lines = useCart();
   const uid = useId();
@@ -111,7 +110,7 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
       setPayments(body.payments);
       setCodAvailable(body.cod);
       // Default to whatever is available (online first when both are).
-      setMethod("online");
+      setMethod(body.payments || !body.cod ? "online" : "cod");
       if (body.ok) {
         setPriced({
           lines: body.lines,
@@ -320,7 +319,7 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
           )}
         </dl>
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-          <Link href="/account" className="btn btn-primary btn-caps">
+          <Link href={guest ? "/track" : "/account"} className="btn btn-primary btn-caps">
             Track your order
           </Link>
           <Link href="/shop" className="btn btn-outline btn-caps">
@@ -508,8 +507,18 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
           </div>
           <div>
             {label("email", "Email")}
-            <input {...field("email")} type="email" readOnly className="field-input cursor-not-allowed bg-ivory-deep" value={values.email} />
-            <p className="mt-1 text-xs text-ink-muted">Your account email. Your invoice and order updates go here.</p>
+            {guest ? (
+              <>
+                <input {...field("email")} type="email" inputMode="email" className="field-input" autoComplete="email" placeholder="you@example.com" value={values.email} onChange={onChange} />
+                {err("email")}
+                <p className="mt-1 text-xs text-ink-muted">Your invoice and order updates go here.</p>
+              </>
+            ) : (
+              <>
+                <input {...field("email")} type="email" readOnly className="field-input cursor-not-allowed bg-ivory-deep" value={values.email} />
+                <p className="mt-1 text-xs text-ink-muted">Your account email. Your invoice and order updates go here.</p>
+              </>
+            )}
           </div>
         </Section>
 
@@ -597,9 +606,20 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
                 sub: "UPI · Cards · Netbanking (Razorpay)",
                 icon: "M3 6h18v12H3zM3 10h18M7 15h3",
                 enabled: payments === true,
+                // Not set up and COD is there instead: don't show a dead option.
+                show: payments === true || codAvailable !== true,
                 note: payments === true ? null : "Coming soon",
               },
-            ].map((o) => {
+              {
+                id: "cod" as const,
+                title: "Cash on Delivery",
+                sub: "Pay in cash or UPI when your order arrives",
+                icon: "M2 7h20v10H2zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M6 12h.01M18 12h.01",
+                enabled: codAvailable === true,
+                show: codAvailable === true,
+                note: null,
+              },
+            ].filter((o) => o.show).map((o) => {
               const on = method === o.id && o.enabled;
               return (
                 <label
@@ -677,28 +697,9 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
         )}
 
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-parchment bg-white px-4 py-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
-          {payments === false ? (
-            // Online payment isn't switched on yet: take the order on WhatsApp instead.
-            <a
-              href={waLink(
-                cms.contact.whatsapp,
-                [
-                  "Hello, I'd like to order:",
-                  ...lines.map((l) => `• ${l.qty} × ${l.title}${l.variantTitle ? ` (${l.variantTitle})` : ""}`),
-                  `Total: ${formatInrExact(priced?.total ?? total)} (incl. GST)`,
-                  ...(values.fullName ? [`Name: ${values.fullName}`] : []),
-                ].join("\n"),
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary h-12 w-full text-base"
-            >
-              Order on WhatsApp · {formatInrExact(total)}
-            </a>
-          ) : (
           <button
             type="submit"
-            disabled={busy || payments !== true || !!notice?.productId}
+            disabled={busy || (method === "cod" ? codAvailable !== true : payments !== true) || !!notice?.productId}
             className="btn btn-primary h-12 w-full text-base disabled:opacity-60"
           >
             {phase === "creating" || phase === "verifying" ? (
@@ -717,9 +718,8 @@ export function Checkout({ profile }: { profile: CheckoutProfile }) {
               </>
             )}
           </button>
-          )}
           <p className="mt-2 text-center text-[0.72rem] text-ink-muted">
-            {payments === false ? "Online payment is being set up — we'll confirm your order and share a secure payment link on WhatsApp." : "UPI · Cards · Netbanking · Wallets — secured by Razorpay"}
+            {method === "cod" ? "No payment now — pay when your order arrives." : "UPI · Cards · Netbanking · Wallets — secured by Razorpay"}
           </p>
         </div>
       </div>

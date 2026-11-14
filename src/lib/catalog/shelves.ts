@@ -10,8 +10,12 @@ export async function shelfProducts(shelf: Shelf): Promise<StoreProduct[] | null
   const all = await getCollection(ALL_HANDLE);
   if (!all) return null;
   if (shelf.newest) return all.filter((p) => p.available).slice(0, NEWEST_COUNT);
-  const inCollection = new Set(((await getCollection(shelf.slug)) ?? []).map((p) => p.handle));
-  return all.filter((p) => inCollection.has(p.handle) || matchesShelf(p, shelf));
+  const inCollection = new Set(((await getCollection(shelf.slug).catch(() => null)) ?? []).map((p) => p.handle));
+  const picked = shelf.handles ?? [];
+  const byHandle = new Map(all.map((p) => [p.handle, p]));
+  const first = picked.flatMap((h) => byHandle.get(h) ?? []);
+  const rest = all.filter((p) => !picked.includes(p.handle) && (inCollection.has(p.handle) || matchesShelf(p, shelf)));
+  return [...first, ...rest];
 }
 
 export interface ShelfView extends Shelf {

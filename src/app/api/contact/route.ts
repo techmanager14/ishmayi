@@ -17,9 +17,11 @@ async function saveToCrm(raw: Record<string, unknown>) {
     fullName: p.customer.fullName,
     email: p.customer.email,
     phone: p.customer.phone,
-    source: "Trivana website — contact form",
+    source: "Ishmayi website — contact form",
   });
-  await addTags(contactId, ["website-contact"]);
+  // Bulk and gift-set requests also get their own tag (Admin → Requests, and filtering in GHL).
+  const topicTag = { bulk: "bulk-enquiry", gift: "gift-enquiry" }[p.message.topic];
+  await addTags(contactId, ["website-contact", ...(topicTag ? [topicTag] : [])]);
   const topic = CONTACT_TOPICS.find((t) => t.value === p.message.topic)?.label ?? p.message.topic;
   await addNote(
     contactId,
@@ -41,7 +43,7 @@ export const POST = createRelay({
       ok: true,
       payload: {
         event: "contact.message_submitted",
-        source: "trivana_website",
+        source: "ishmayi_website",
         submissionId,
         submittedAt: new Date().toISOString(),
         customer: { fullName: data.name, email: data.email, phone: data.phone },

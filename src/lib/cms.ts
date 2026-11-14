@@ -4,12 +4,12 @@ import { defaultCms, normaliseCms, type CmsContent } from "./cms-types";
 import { ghlApi, ghlConfigured, locationId } from "./ghl-api";
 
 // The website's editable content is stored as one JSON "custom value" in the
-// client's GoHighLevel location (Settings → Custom Values → trivana_website_content),
+// client's GoHighLevel location (Settings → Custom Values → ishmayi_website_content),
 // so no extra database is needed. Pages read it through the cache (tag "cms");
 // saving from the admin panel purges that tag.
 
 export const CMS_TAG = "cms";
-const NAME = "trivana_website_content";
+const NAME = "ishmayi_website_content";
 
 interface CustomValue {
   id: string;

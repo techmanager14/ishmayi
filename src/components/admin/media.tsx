@@ -112,7 +112,7 @@ export function MediaLibrary({ kind = "all", onPick, manage = false }: { kind?: 
                 key={k}
                 type="button"
                 onClick={() => setFilter(k)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold capitalize ${filter === k ? "bg-[#e3425c] text-white" : "text-ink-muted hover:text-charcoal"}`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold capitalize ${filter === k ? "bg-[#5e0f2c] text-white" : "text-ink-muted hover:text-charcoal"}`}
               >
                 {k === "all" ? "All" : `${k}s`}
               </button>
@@ -127,8 +127,8 @@ export function MediaLibrary({ kind = "all", onPick, manage = false }: { kind?: 
       <p className="mt-2 text-xs text-ink-muted">
         Photos are resized automatically. Videos up to 11 MB upload here — bigger ones: upload in GoHighLevel → Media Storage and they appear in this list, or use a YouTube link.
       </p>
-      {busy && <p className="mt-3 rounded-lg bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-300">{busy}</p>}
-      {error && <p role="alert" className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-300">{error}</p>}
+      {busy && <p className="mt-3 rounded-lg bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-800">{busy}</p>}
+      {error && <p role="alert" className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-800">{error}</p>}
 
       <ul className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
         {files.map((f) => (
@@ -282,11 +282,11 @@ export function PhotoAdder({ onAdd }: { onAdd: (urls: string[]) => void }) {
         <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(e) => void onFiles(e.target.files).then(() => (e.target.value = ""))} />
       </div>
       {busy && (
-        <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-sky-300">
+        <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-sky-800">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300/30 border-t-sky-300" aria-hidden="true" /> {busy}
         </p>
       )}
-      {error && <p role="alert" className="mt-2 text-sm font-semibold text-rose-300">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm font-semibold text-rose-800">{error}</p>}
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-6" role="dialog" aria-modal="true" aria-label="Media library">
           <button type="button" aria-label="Close" className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />

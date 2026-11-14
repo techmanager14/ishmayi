@@ -10,7 +10,7 @@ export default async function Page() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Discount codes" sub="Codes customers can use at checkout. Discounts are checked on the server." />
+      <PageTitle title="Discount codes" sub="Codes used at checkout." />
       <CouponsEditor initial={c.coupons} />
     </>
   );

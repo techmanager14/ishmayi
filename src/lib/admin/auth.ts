@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 //   ADMIN_EMAIL, ADMIN_PASSWORD (12+ characters), ADMIN_SESSION_SECRET (32+ random characters)
 // The session is a signed, httpOnly cookie that expires after 12 hours.
 
-const COOKIE = "trivana_admin";
+const COOKIE = "ishmayi_admin";
 const MAX_AGE = 12 * 60 * 60;
 const env = (k: string) => process.env[k]?.trim() ?? "";
 const secret = () => env("ADMIN_SESSION_SECRET");

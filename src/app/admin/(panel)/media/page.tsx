@@ -8,7 +8,7 @@ export default async function MediaPage() {
   await requireAdmin();
   return (
     <>
-      <PageTitle title="Media library" sub="Photos and videos stored in your GoHighLevel media storage. Use them in banners, categories, products and videos." />
+      <PageTitle title="Media library" sub="Your photos and videos." />
       <Card>
         <MediaLibrary manage />
       </Card>

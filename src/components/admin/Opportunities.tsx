@@ -43,7 +43,7 @@ export async function OpportunityList({ kind, status, q }: { kind: "order" | "co
         <Tabs items={[tab(undefined, "All"), tab("open", "Open"), tab("won", "Completed"), tab("lost", "Cancelled")]} />
         <form className="flex gap-2" action={m.base}>
           {status && <input type="hidden" name="status" value={status} />}
-          <input name="q" defaultValue={q} placeholder="Search name, email, phone, TRV-…" className={`${input} w-64 py-2`} aria-label="Search" />
+          <input name="q" defaultValue={q} placeholder="Search name, email, phone, ISH-…" className={`${input} w-64 py-2`} aria-label="Search" />
           <button className={btn.outline}>Search</button>
         </form>
       </div>
@@ -66,7 +66,7 @@ export async function OpportunityList({ kind, status, q }: { kind: "order" | "co
                 {rows.map((o) => (
                   <tr key={o.id} className="hover:bg-ivory-deep/60">
                     <td className="px-5 py-3">
-                      <Link href={`${m.base}/${o.id}`} className="font-bold text-[#ff8197] hover:underline">
+                      <Link href={`${m.base}/${o.id}`} className="font-bold text-burgundy hover:underline">
                         {kind === "order" ? (o.reference ?? "Order") : o.detail || "Consultation"}
                       </Link>
                       {kind === "order" && <span className="ml-2 text-xs text-ink-muted">{o.detail}</span>}
@@ -115,15 +115,15 @@ export async function OpportunityDetail({ kind, id }: { kind: "order" | "consult
         title={kind === "order" ? (o.reference ?? "Order") : o.detail || "Consultation"}
         sub={
           <>
-            <Link href={m.base} className="font-semibold text-[#ff8197] hover:underline">
-              ← {m.title}
+            <Link href={m.base} className="font-semibold text-burgundy hover:underline">
+              {m.title}
             </Link>{" "}
             · created {fmtDate(o.createdAt)}
           </>
         }
         actions={
           <div className="flex items-center gap-2">
-            {o.name.includes("🎁") && <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-300">🎁 Gift order</span>}
+            {o.name.includes("🎁") && <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-800">🎁 Gift order</span>}
             <Badge status={o.status} />
           </div>
         }
@@ -219,18 +219,18 @@ export async function OpportunityDetail({ kind, id }: { kind: "order" | "consult
             <p className="font-bold">{o.contact.name || "—"}</p>
             {o.contact.phone && (
               <p className="mt-1 text-sm">
-                <a href={`tel:${o.contact.phone}`} className="text-[#ff8197] hover:underline">
+                <a href={`tel:${o.contact.phone}`} className="text-burgundy hover:underline">
                   {o.contact.phone}
                 </a>{" "}
                 ·{" "}
-                <a href={`https://wa.me/${o.contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-[#ff8197] hover:underline">
+                <a href={`https://wa.me/${o.contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="text-burgundy hover:underline">
                   WhatsApp
                 </a>
               </p>
             )}
             {o.contact.email && (
               <p className="mt-1 text-sm">
-                <a href={`mailto:${o.contact.email}`} className="text-[#ff8197] hover:underline">
+                <a href={`mailto:${o.contact.email}`} className="text-burgundy hover:underline">
                   {o.contact.email}
                 </a>
               </p>

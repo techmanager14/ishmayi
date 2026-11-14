@@ -9,7 +9,6 @@ import { formatInr } from "@/lib/site";
 import type { SearchResponse } from "@/app/api/search/route";
 
 const EMPTY: SearchResponse = { collections: [], products: [] };
-const SUGGESTIONS = ["Necklace", "Pearl", "Amethyst", "Rose Quartz"];
 
 /** Product search with live suggestions; pressing Enter opens the full results. */
 export function SearchBar({ className = "" }: { className?: string }) {
@@ -143,14 +142,7 @@ export function SearchBar({ className = "" }: { className?: string }) {
           {nothing && (
             <div className="px-4 py-3" role="status">
               <p className="font-display text-lg text-charcoal">No results for &ldquo;{term}&rdquo;</p>
-              <p className="mt-1 text-sm text-ink-muted">Check the spelling, or try one of these:</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} type="button" onClick={() => setQ(s)} className="border border-parchment px-3 py-1 text-[0.8rem] text-charcoal hover:border-burgundy">
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <p className="mt-1 text-sm text-ink-muted">Check the spelling, or try a shorter word.</p>
             </div>
           )}
 

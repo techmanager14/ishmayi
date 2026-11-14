@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ type: s
   return new NextResponse(csv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="trivana-${type}-${date}.csv"`,
+      "Content-Disposition": `attachment; filename="ishmayi-${type}-${date}.csv"`,
       "Cache-Control": "no-store",
     },
   });

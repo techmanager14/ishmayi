@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Plus, ShoppingBag, X } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,12 +11,13 @@ import { formatInr } from "@/lib/site";
 import { useCms } from "./CmsProvider";
 
 /** Bag icon with item count; opens the drawer. */
-export function CartButton({ className = "", labelClassName = "" }: { className?: string; labelClassName?: string }) {
+export function CartButton({ className = "", labelClassName = "", flyTarget = false }: { className?: string; labelClassName?: string; flyTarget?: boolean }) {
   const lines = useCart();
   const count = cartCount(lines);
   return (
     <button type="button" onClick={() => cart.open()} className={className} aria-label={`Bag, ${count} ${count === 1 ? "item" : "items"}`}>
-      <span className="relative">
+      {/* data-bag-target: where the "added to bag" photo flies to (lib/fly-to-bag). */}
+      <span className="relative" data-bag-target={flyTarget || undefined}>
         <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.4} aria-hidden="true" />
         {count > 0 && <span className="absolute -top-1.5 -right-2 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-burgundy px-1 text-[0.62rem] text-white">{count}</span>}
       </span>
@@ -55,6 +56,67 @@ export function CartLineRow({ line: l, onNavigate }: { line: CartLine; onNavigat
         </div>
       </div>
     </li>
+  );
+}
+
+interface BagMatch {
+  handle: string;
+  title: string;
+  image: string | null;
+  price: number;
+  variantId: string;
+  needsChoice: boolean;
+}
+
+/** Perfect matches for what's in the bag, each one tap to add. */
+function BagMatches({ handles, onNavigate }: { handles: string[]; onNavigate: () => void }) {
+  const [items, setItems] = useState<BagMatch[]>([]);
+  const key = handles.join(",");
+  useEffect(() => {
+    let stale = false;
+    fetch(`/api/perfect-match?h=${encodeURIComponent(key)}`)
+      .then((r) => r.json() as Promise<{ matches?: BagMatch[] }>)
+      .then((j) => !stale && setItems(j.matches ?? []))
+      .catch(() => !stale && setItems([]));
+    return () => {
+      stale = true;
+    };
+  }, [key]);
+  if (!items.length) return null;
+  return (
+    <div className="border-t border-parchment bg-blush/60 px-5 py-3">
+      <p className="flex items-center gap-1.5 text-xs font-bold text-burgundy">
+        <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Perfect match for your bag
+      </p>
+      <ul className="no-scrollbar mt-2 flex gap-2.5 overflow-x-auto">
+        {items.map((m) => (
+          <li key={m.handle} className="flex w-[13rem] shrink-0 items-center gap-2 rounded-xl bg-white p-2">
+            <Link href={`/product/${m.handle}`} onClick={onNavigate} className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-ivory-deep">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {m.image && <img src={thumbUrl(m.image, 120)} alt="" className="h-full w-full object-cover" />}
+            </Link>
+            <span className="min-w-0 flex-1">
+              <span className="line-clamp-2 text-[0.72rem] leading-snug font-semibold text-charcoal">{m.title}</span>
+              <span className="text-xs font-bold text-charcoal">{formatInr(m.price)}</span>
+            </span>
+            {m.needsChoice ? (
+              <Link href={`/product/${m.handle}`} onClick={onNavigate} className="shrink-0 rounded-lg border border-burgundy px-2 py-1.5 text-[0.7rem] font-bold text-burgundy">
+                Choose
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => cart.add({ productId: m.handle, variantId: m.variantId, title: m.title, variantTitle: null, image: m.image, price: m.price }, 1)}
+                aria-label={`Add ${m.title} to bag`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-burgundy text-white"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -128,6 +190,7 @@ export function CartDrawer() {
                 <CartLineRow key={`${l.productId}:${l.variantId}`} line={l} onNavigate={close} />
               ))}
             </ul>
+            <BagMatches handles={[...new Set(lines.map((l) => l.productId))]} onNavigate={close} />
             <div className="border-t border-parchment px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <div className="flex items-center justify-between text-[0.95rem] text-charcoal">
                 <span>Subtotal</span>

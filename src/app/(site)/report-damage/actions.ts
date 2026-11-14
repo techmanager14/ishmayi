@@ -19,7 +19,7 @@ export async function checkOrderAction(order: string, phone: string): Promise<Ch
   if (checkByIp(await ip())) return { ok: false, message: "Too many attempts. Please wait a few minutes and try again." };
   try {
     const found = await findOrder(String(order).slice(0, 20), String(phone).slice(0, 20));
-    if (!found) return { ok: false, message: "We couldn't find an order with that number and phone. Check both — the order number looks like TRV-ABC123." };
+    if (!found) return { ok: false, message: "We couldn't find an order with that number and phone. Check both — the order number looks like ISH-ABC123." };
     return { ok: true, pass: claimPass(found.order.reference, found.contactId), ref: found.order.reference, items: found.order.items };
   } catch {
     return { ok: false, message: "We couldn't check your order just now. Please try again in a minute." };

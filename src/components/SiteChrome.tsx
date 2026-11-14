@@ -21,14 +21,18 @@ const organisationJsonLd = {
   legalName: site.legalName,
   url: site.url,
   description: site.description,
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: site.address.street,
-    addressLocality: `${site.address.locality}, ${site.address.city}`,
-    addressRegion: site.address.region,
-    postalCode: site.address.postalCode,
-    addressCountry: site.address.country,
-  },
+  ...(site.address.street
+    ? {
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: site.address.street,
+          addressLocality: [site.address.locality, site.address.city].filter(Boolean).join(", "),
+          addressRegion: site.address.region,
+          postalCode: site.address.postalCode,
+          addressCountry: site.address.country,
+        },
+      }
+    : {}),
   ...(site.contact.phone ? { telephone: site.contact.phone } : {}),
   ...(site.contact.email ? { email: site.contact.email } : {}),
 };

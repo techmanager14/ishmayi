@@ -6,10 +6,12 @@ import { ProductCard } from "@/components/ProductCard";
 import { QuickNav } from "@/components/QuickNav";
 import { Breadcrumbs, EmptyState, SectionHeading } from "@/components/Sections";
 import { TrackView } from "@/components/Tracking";
-import { allShelves, featuredCategories, quickNav, shelfBySlug, shelfHref } from "@/data/shelves";
+import { allShelves, featuredCategories, shelfBySlug, shelfHref } from "@/data/shelves";
 import { getCollection, type StoreProduct } from "@/lib/catalog";
 import { ALL_HANDLE, getCatalogue } from "@/lib/catalog/config";
-import { shelfProducts, shelfViews } from "@/lib/catalog/shelves";
+import { occasionShelves } from "@/lib/catalog/occasions";
+import { shelfProducts } from "@/lib/catalog/shelves";
+import { categoryTiles } from "@/lib/catalog/tiles";
 
 export const metadata: Metadata = {
   title: "Shop",
@@ -26,7 +28,8 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
 
   // A collection is either an admin category (a GoHighLevel collection) or a merchandising shelf.
   const category = catalogue.all.find((c) => c.handle === requested && c.status !== "hidden") ?? null;
-  const shelf = category ? null : (shelfBySlug(requested) ?? null);
+  const occasion = category ? null : (await occasionShelves({ includeHidden: true })).find((o) => o.slug === requested);
+  const shelf = category ? null : (occasion ?? shelfBySlug(requested) ?? null);
   const active = category?.handle ?? shelf?.slug ?? ALL_HANDLE;
   const title = category?.label ?? shelf?.title ?? "All products";
   const intro = category?.blurb ?? shelf?.blurb ?? "The complete Ishmayi collection.";
@@ -40,7 +43,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
 
   // Sidebar: everything on sale, then only the shelves that currently hold products.
   // Material and occasion shelves have their own links, so they only appear while being viewed.
-  const candidates = [...new Map([...featuredCategories, ...allShelves].map((s) => [s.slug, s])).values()].filter((s) => !s.newest && (!SIDEBAR_HIDDEN.has(s.slug) || s.slug === active));
+  const candidates = [...new Map([...featuredCategories, ...allShelves, ...(occasion ? [occasion] : [])].map((s) => [s.slug, s])).values()].filter((s) => !s.newest && (!SIDEBAR_HIDDEN.has(s.slug) || s.slug === active));
   const shelfCounts = await Promise.all(candidates.map(async (s) => ({ s, count: (await shelfProducts(s))?.length ?? 0 })));
   const categoryCounts = await Promise.all(catalogue.categories.map(async (c) => ({ c, count: (await getCollection(c.handle))?.length ?? null })));
   const allCount = (await getCollection(ALL_HANDLE))?.length ?? null;
@@ -52,7 +55,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <QuickNav items={(await shelfViews(quickNav)).map((s) => ({ slug: s.slug, href: s.href, title: s.title, art: <ArtOrPhoto image={s.image} motif={s.motif} tone={s.tone} sizes="130px" /> }))} />
+      <QuickNav items={(await categoryTiles()).map((t) => ({ slug: t.slug, href: t.href, title: t.title, art: <ArtOrPhoto image={t.image} motif="sparkle" tone="plum" sizes="130px" /> }))} />
 
       <section className="border-y border-parchment bg-ivory-deep/60">
         <div className="container-page py-5 md:py-8">

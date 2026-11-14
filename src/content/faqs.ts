@@ -12,7 +12,7 @@ export const faqGroups: { title: string; id: string; items: Faq[] }[] = [
     items: [
       {
         q: "Do I need an account to order?",
-        a: "Yes. A free account lets you check out, track your order and see your invoices. Your bag and wishlist are saved on your device while you browse.",
+        a: "No. You can check out as a guest with your email and phone number, and track your order with your order number and phone. A free account saves your details for next time and keeps all your orders and invoices in one place.",
       },
       {
         q: "How do promo codes work?",

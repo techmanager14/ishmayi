@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ContactList } from "@/components/ContactList";
 import { PolicyPage } from "@/components/PolicyPage";
-import { site } from "@/lib/site";
+import { addressLine, operatedBy, site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy Notice",
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
     <PolicyPage policy="privacy" title="Privacy Notice" intro="How we collect, use and protect your personal information.">
       <h2>Who we are</h2>
       <p>
-        {site.name} is operated by {site.legalName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;), {site.address.street}, {site.address.locality}, {site.address.city} – {site.address.postalCode}. We are
+        {site.name}{operatedBy ? <>, operated by {operatedBy}</> : null} (&ldquo;we&rdquo;, &ldquo;us&rdquo;){addressLine ? <>, {addressLine}</> : null}. We are
         responsible for the personal information you submit through this website.
       </p>
 

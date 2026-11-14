@@ -10,7 +10,7 @@ export default async function Page() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Policies" sub="Privacy, terms, shipping and refund policies." />
+      <PageTitle title="Policies" sub="Privacy, terms, shipping, refunds." />
       <PoliciesEditor initial={c.policies} />
     </>
   );

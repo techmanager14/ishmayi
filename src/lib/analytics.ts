@@ -21,7 +21,7 @@ export interface AnalyticsParams {
   error_code?: string;
 }
 
-const CONSENT_KEY = "trivana-analytics-consent";
+const CONSENT_KEY = "ishmayi-analytics-consent";
 
 export type Consent = "granted" | "denied";
 
@@ -40,7 +40,7 @@ export function writeConsent(value: Consent) {
   } catch {
     /* storage blocked — consent applies to this page view only */
   }
-  window.dispatchEvent(new CustomEvent("trivana:consent", { detail: value }));
+  window.dispatchEvent(new CustomEvent("ishmayi:consent", { detail: value }));
 }
 
 declare global {

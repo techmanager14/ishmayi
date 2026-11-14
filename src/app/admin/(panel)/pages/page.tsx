@@ -10,7 +10,7 @@ export default async function Page() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Pages & text" sub="Brand lines, section titles, pillars and the About page." />
+      <PageTitle title="Pages & text" sub="Text shown across the website." />
       <PagesEditor initial={c.pages} />
     </>
   );

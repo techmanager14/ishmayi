@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CmsContent } from "@/lib/cms-types";
-import { policyLinks, site } from "@/lib/site";
+import { operatedBy, policyLinks, site } from "@/lib/site";
 import { ContactList } from "./ContactList";
 import { Logo } from "./Header";
 import { CookieSettingsButton } from "./Tracking";
@@ -91,7 +91,7 @@ export function Footer({ social, nav, gstin, essence }: { social: CmsContent["so
 
       <div className="border-t border-parchment">
         <p className="container-page py-4 text-xs">
-          © {year} {site.name}. Operated by {site.legalName}.{gstin ? <> GSTIN: <span className="text-charcoal">{gstin}</span></> : null}
+          © {year} {site.name}.{operatedBy ? ` Operated by ${operatedBy}.` : ""}{gstin ? <> GSTIN: <span className="text-charcoal">{gstin}</span></> : null}
         </p>
       </div>
     </footer>

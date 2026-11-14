@@ -10,7 +10,7 @@ export default async function Page() {
   const c = await getCmsFresh();
   return (
     <>
-      <PageTitle title="Menu" sub="The main menu links." />
+      <PageTitle title="Menu" sub="Header and footer links." />
       <NavEditor initial={c.nav} />
     </>
   );

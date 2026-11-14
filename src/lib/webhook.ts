@@ -114,13 +114,13 @@ export async function sendWebhook(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Idempotency-Key": submissionId,
-    "X-Trivana-Submission-Id": submissionId,
+    "X-Ishmayi-Submission-Id": submissionId,
   };
   if (cfg.token) headers.Authorization = `Bearer ${cfg.token}`;
   if (cfg.secret) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    headers["X-Trivana-Timestamp"] = timestamp;
-    headers["X-Trivana-Signature"] = `sha256=${createHmac("sha256", cfg.secret).update(`${timestamp}.${body}`).digest("hex")}`;
+    headers["X-Ishmayi-Timestamp"] = timestamp;
+    headers["X-Ishmayi-Signature"] = `sha256=${createHmac("sha256", cfg.secret).update(`${timestamp}.${body}`).digest("hex")}`;
   }
 
   let res: Response;

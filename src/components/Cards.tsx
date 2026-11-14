@@ -3,22 +3,33 @@ import Link from "next/link";
 import type { ShelfView } from "@/lib/catalog/shelves";
 import { ArtOrPhoto } from "./Art";
 
-const countLine = (count: number | null) => (count === null ? "" : count === 0 ? "Arriving soon" : `${count} ${count === 1 ? "piece" : "pieces"}`);
+const countLine = (count: number | null) => (count === null ? "" : count === 0 ? "Coming soon" : `${count} ${count === 1 ? "piece" : "pieces"}`);
 
-/** Grid card for a product category: image, title, short description. */
+/**
+ * Grid card for a product category. Text sits on the photo so every card is the same
+ * height whatever the title length; the piece count is a small label in the corner.
+ */
 export function CategoryCard({ shelf }: { shelf: ShelfView }) {
+  const count = countLine(shelf.count);
   return (
-    <Link href={shelf.href} className="group block">
-      <span className="relative block aspect-square overflow-hidden rounded-2xl">
-        <span className="absolute inset-0 block transition-transform duration-700 group-hover:scale-[1.04]">
-          <ArtOrPhoto image={shelf.image} motif={shelf.motif} tone={shelf.tone} sizes="(min-width: 1024px) 30vw, 50vw" />
+    <Link href={shelf.href} className="group relative block aspect-[4/5] overflow-hidden rounded-2xl shadow-[var(--shadow-soft)] md:rounded-3xl">
+      <span className="absolute inset-0 block transition-transform duration-700 group-hover:scale-[1.05]">
+        <ArtOrPhoto image={shelf.image} motif={shelf.motif} tone={shelf.tone} sizes="(min-width: 768px) 24vw, 50vw" />
+      </span>
+      <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+      {count && (
+        <span className={`absolute top-2.5 right-2.5 rounded-full px-2.5 py-1 text-[0.62rem] font-bold tracking-wide uppercase md:top-3.5 md:right-3.5 md:text-[0.7rem] ${shelf.count ? "bg-white/90 text-burgundy" : "bg-black/45 text-white"}`}>
+          {count}
+        </span>
+      )}
+      <span className="absolute inset-x-0 bottom-0 flex flex-col p-3 text-white md:p-5">
+        <span className="text-[0.95rem] leading-tight font-bold [text-wrap:balance] md:text-[1.25rem]">{shelf.title}</span>
+        <span className="mt-1 line-clamp-2 text-[0.72rem] leading-snug text-white/85 md:text-[0.88rem]">{shelf.blurb}</span>
+        <span className="mt-2 inline-flex items-center gap-1 text-[0.72rem] font-bold text-gold-light md:mt-3 md:text-[0.85rem]">
+          Shop now
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
         </span>
       </span>
-      <span className="mt-2.5 block text-center font-display text-[1rem] leading-tight text-charcoal md:text-[1.2rem]">
-        <span className="hover-rule">{shelf.title}</span>
-      </span>
-      <span className="mt-0.5 block text-center text-[0.8rem] text-ink-muted md:text-[0.88rem]">{shelf.blurb}</span>
-      <span className="mt-0.5 block text-center text-[0.75rem] font-bold text-gold-deep">{countLine(shelf.count)}</span>
     </Link>
   );
 }

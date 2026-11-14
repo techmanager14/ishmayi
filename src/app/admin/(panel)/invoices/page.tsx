@@ -1,3 +1,4 @@
+import { CircleCheck, Clock, FilePen } from "lucide-react";
 import Link from "next/link";
 import { Badge, Card, Empty, GhlError, PageTitle, Stat, Tabs, btn, fmtDate, input } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -40,11 +41,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           </>
         }
       />
-      {deleted && <p className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-300">Draft deleted.</p>}
+      {deleted && <p className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-800">Draft deleted.</p>}
       <div className="mb-5 grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-3">
-        <Stat label="Outstanding" value={formatInr(outstanding)} sub="sent, not yet paid" tone="gold" icon="M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z" />
-        <Stat label="Paid" value={formatInr(paid)} sub={`${count("paid")} invoices`} tone="emerald" icon="m5 12 5 5 9-10" />
-        <Stat label="Drafts" value={count("draft")} sub="not sent yet" tone="violet" icon="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+        <Stat label="Outstanding" value={formatInr(outstanding)} sub="sent, not yet paid" tone="gold" icon={Clock} />
+        <Stat label="Paid" value={formatInr(paid)} sub={`${count("paid")} invoices`} tone="emerald" icon={CircleCheck} />
+        <Stat label="Drafts" value={count("draft")} sub="not sent yet" tone="violet" icon={FilePen} />
       </div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Tabs items={[tab(undefined, "All"), tab("draft", "Drafts"), tab("sent", "Sent"), tab("paid", "Paid"), tab("overdue", "Overdue"), tab("void", "Void")]} />
@@ -58,7 +59,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         {rows.length === 0 ? (
           <Empty>
             No invoices here.{" "}
-            <Link href="/admin/invoices/new" className="font-bold text-[#ff8197]">
+            <Link href="/admin/invoices/new" className="font-bold text-burgundy">
               Create one
             </Link>{" "}
             — or open an order and press “Create invoice”.
@@ -80,7 +81,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                 {rows.map((i) => (
                   <tr key={i.id} className="hover:bg-ivory-deep/60">
                     <td className="px-5 py-3">
-                      <Link href={`/admin/invoices/${i.id}`} className="font-bold text-[#ff8197] hover:underline">
+                      <Link href={`/admin/invoices/${i.id}`} className="font-bold text-burgundy hover:underline">
                         {i.number}
                       </Link>
                       <span className="block max-w-[14rem] truncate text-xs text-ink-muted">{i.name}</span>

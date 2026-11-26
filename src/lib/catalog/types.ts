@@ -26,6 +26,16 @@ export interface ProductVariant {
   price: number;
   compareAtPrice: number | null;
   available: boolean;
+  /** One value per product option, in option order (e.g. ["Gold", "7"]). Empty for simple products. */
+  options: string[];
+  /** Photos chosen for this variant in the admin (urls); empty = the product's photos. */
+  images: string[];
+}
+
+/** An option customers choose, e.g. Size with values 6, 7, 8. */
+export interface ProductOption {
+  name: string;
+  values: string[];
 }
 
 /** Full product for the quick view and for pricing a cart. */
@@ -38,6 +48,8 @@ export interface ProductDetail {
   variants: ProductVariant[];
   showVariantPicker: boolean;
   optionName: string;
+  /** Options (Size, Colour…) when every variant is a combination of them; empty = pick from the variant list. */
+  options: ProductOption[];
   /** Can be paid for online (GHL products; old-catalogue items only in development). */
   purchasable?: boolean;
 }
@@ -53,5 +65,5 @@ export interface CatalogProvider {
   /** Products in a collection (or every product for the "all" handle). null = store unreachable. */
   collection(handle: string): Promise<StoreProduct[] | null>;
   /** One product with its variants. null = not found / unreachable. fresh = bypass caches (live prices). */
-  product(handle: string, opts?: { fresh?: boolean }): Promise<ProductDetail | null>;
+  product(handle: string, opts?: { fresh?: boolean; preview?: boolean }): Promise<ProductDetail | null>;
 }

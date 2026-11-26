@@ -6,6 +6,7 @@ import { ProductView } from "@/components/ProductView";
 import { Breadcrumbs, SectionHeading } from "@/components/Sections";
 import { getCollection, getProduct } from "@/lib/catalog";
 import { getCms } from "@/lib/cms";
+import { variantKey } from "@/lib/cms-types";
 import { perfectMatches } from "@/lib/catalog/pairs";
 import { productPromises } from "@/lib/promises";
 import { couponConditions, couponValue, publicCoupons } from "@/lib/promo-codes";
@@ -33,8 +34,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { handle } = await params;
-  const [product, all, cms] = await Promise.all([getProduct(handle), getCollection(ALL_HANDLE), getCms()]);
-  if (!product) notFound();
+  const [found, all, cms] = await Promise.all([getProduct(handle), getCollection(ALL_HANDLE), getCms()]);
+  if (!found) notFound();
+  // Photos chosen for each variant in the admin.
+  const photos = cms.variantImages[found.handle] ?? {};
+  const product = { ...found, variants: found.variants.map((v) => ({ ...v, images: v.options.length ? (photos[variantKey(v.options)] ?? []) : [] })) };
   const matches = await perfectMatches([product.handle]);
 
   const related = (all ?? []).filter((p) => p.handle !== product.handle && p.available && p.image).slice(0, RELATED_COUNT);

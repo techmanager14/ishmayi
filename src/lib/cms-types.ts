@@ -157,6 +157,8 @@ export interface CmsContent {
   promiseLibrary: string[];
   /** Product code (SKU) per product id, e.g. "ISH-BR-012". */
   productCodes: Record<string, string>;
+  /** Photos per variant: product id → variant key ("Gold / 7", see variantKey) → photo urls. */
+  variantImages: Record<string, Record<string, string[]>>;
   /** Home "Shop by Occasion": heading and cards. */
   occasions: { title: string; items: CmsOccasion[] };
   pages: CmsPages;
@@ -236,6 +238,7 @@ export const defaultCms: CmsContent = {
   promises: {},
   promiseLibrary: [],
   productCodes: {},
+  variantImages: {},
   occasions: {
     title: "Shop by Occasion",
     items: builtInOccasions.map((o) => ({ id: o.slug, title: o.title, blurb: o.blurb, image: o.image ?? "", enabled: true, products: [], autoMatch: true })),
@@ -462,6 +465,7 @@ export function normaliseCms(raw: unknown): CmsContent {
     // Never saved before: start from the custom promises already used on products.
     promiseLibrary: cleanPromiseList(Array.isArray(r.promiseLibrary) ? r.promiseLibrary : Object.values(promises).flat().filter((x) => !(PROMISE_PRESETS as readonly string[]).includes(x)), 40),
     productCodes: normaliseCodes(r.productCodes),
+    variantImages: normaliseVariantImages(r.variantImages),
     occasions: normaliseOccasions(r.occasions, d.occasions),
     store: {
       ordersOpen: bool(st.ordersOpen, d.store.ordersOpen),
@@ -609,6 +613,25 @@ function normalisePromises(v: unknown): Record<string, string[]> {
 
 /** Product codes: letters, numbers, - _ / . and spaces, up to 24 characters. */
 export const cleanProductCode = (v: unknown) => (typeof v === "string" ? v.toUpperCase().replace(/[^A-Z0-9\-_/. ]/g, "").replace(/\s+/g, " ").trim().slice(0, 24) : "");
+
+/** The key a variant's photos are saved under: its option values in order, e.g. "Gold / 7". */
+export const variantKey = (values: string[]) => values.map((v) => v.trim()).join(" / ");
+
+/** Up to 10 https photos per variant, 100 variants per product. */
+function normaliseVariantImages(v: unknown): Record<string, Record<string, string[]>> {
+  if (!isObj(v)) return {};
+  const out: Record<string, Record<string, string[]>> = {};
+  for (const [id, map] of Object.entries(v).slice(0, 2000)) {
+    if (!PRODUCT_ID.test(id) || !isObj(map)) continue;
+    const clean: Record<string, string[]> = {};
+    for (const [key, list] of Object.entries(map).slice(0, 100)) {
+      const urls = Array.isArray(list) ? [...new Set(list.filter((u): u is string => typeof u === "string" && /^https:\/\//.test(u)).map((u) => u.slice(0, 600)))].slice(0, 10) : [];
+      if (key && key.length <= 200 && urls.length) clean[key] = urls;
+    }
+    if (Object.keys(clean).length) out[id] = clean;
+  }
+  return out;
+}
 
 function normaliseCodes(v: unknown): Record<string, string> {
   if (!v || typeof v !== "object") return {};

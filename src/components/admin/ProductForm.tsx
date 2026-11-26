@@ -7,6 +7,7 @@ import { thumbUrl } from "@/lib/images";
 import { ActionForm, Submit } from "./forms";
 import { PhotoAdder } from "./media";
 import { btn, input, label } from "./ui";
+import { VariantsEditor, type VariantsInitial } from "./VariantsEditor";
 
 export interface ProductFormProps {
   product: {
@@ -16,8 +17,11 @@ export interface ProductFormProps {
     availableInStore: boolean;
     collectionIds: string[];
     images: string[];
-    prices: { id: string; name: string; amount: number; compareAtPrice: number | null; trackInventory: boolean; availableQuantity: number | null }[];
+    options: VariantsInitial["options"];
+    prices: VariantsInitial["prices"];
   } | null;
+  /** Saved photos per variant ("Gold / 7" → urls). */
+  variantImages: Record<string, string[]>;
   categories: { label: string; onSale: boolean; collectionId: string | null }[];
   /** Perfect match picker (existing products only). */
   pairing?: { selected: string[]; options: { handle: string; title: string; image: string | null; price: number | null }[] };
@@ -26,18 +30,6 @@ export interface ProductFormProps {
   /** Product code (SKU) shown on the website. */
   code: string;
 }
-
-interface PriceRow {
-  key: string;
-  id: string;
-  name: string;
-  amount: string;
-  compare: string;
-  track: boolean;
-  qty: string;
-}
-let rowSeq = 0;
-const blankPrice = (): PriceRow => ({ key: `new-${++rowSeq}`, id: "", name: "", amount: "", compare: "", track: false, qty: "" });
 
 const MAX_PROMISES = 6;
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -165,27 +157,11 @@ function PromisesPicker({ selected, presets, library: initialLibrary }: ProductF
   );
 }
 
-export function ProductForm({ product, categories, pairing, promises, code }: ProductFormProps) {
+export function ProductForm({ product, categories, pairing, promises, code, variantImages }: ProductFormProps) {
   const [images, setImages] = useState(product?.images ?? []);
+  const [variantsInitial] = useState<VariantsInitial>(() => ({ options: product?.options ?? [], prices: product?.prices ?? [], images: variantImages }));
   const [pairs, setPairs] = useState(pairing?.selected ?? []);
   const [pairQuery, setPairQuery] = useState("");
-  // Options are kept as typed text so nothing is lost while editing; the server checks the numbers.
-  const [prices, setPrices] = useState<PriceRow[]>(() =>
-    product?.prices.length
-      ? product.prices.map((p) => ({
-          key: p.id,
-          id: p.id,
-          // A single option named after the product doesn't need a name of its own.
-          name: product.prices.length === 1 && p.name === product.name ? "" : p.name,
-          amount: p.amount ? String(p.amount) : "",
-          compare: p.compareAtPrice ? String(p.compareAtPrice) : "",
-          track: p.trackInventory,
-          qty: p.availableQuantity === null ? "" : String(p.availableQuantity),
-        }))
-      : [blankPrice()],
-  );
-  const [removedPrices, setRemovedPrices] = useState<string[]>([]);
-  const setPrice = (key: string, patch: Partial<PriceRow>) => setPrices((cur) => cur.map((x) => (x.key === key ? { ...x, ...patch } : x)));
   const siteIds = new Set(categories.map((c) => c.collectionId).filter(Boolean));
   // Collections outside the website's categories are kept as they are.
   const otherCollections = (product?.collectionIds ?? []).filter((id) => !siteIds.has(id));
@@ -242,82 +218,7 @@ export function ProductForm({ product, categories, pairing, promises, code }: Pr
           <p className="mt-2 text-xs text-ink-muted">Photos upload straight away and are resized automatically. Square photos look best; the first is the cover.</p>
         </section>
 
-        <section className="rounded-2xl border border-parchment bg-panel p-5">
-          <h2 className="text-base font-bold">Price & options</h2>
-          <p className="mt-0.5 mb-3 text-xs text-ink-muted">One row = one choice the customer can pick (size, colour, length…). With 2 or more, customers choose on the product page.</p>
-          {removedPrices.map((pid) => (
-            <input key={pid} type="hidden" name="priceDelete" value={pid} />
-          ))}
-          <ul className="space-y-3">
-            {prices.map((p, i) => {
-              const many = prices.length > 1;
-              return (
-                <li key={p.key} className="rounded-xl bg-ivory-deep p-3">
-                  <input type="hidden" name="priceId" value={p.id} />
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-charcoal">{many ? `Option ${i + 1}` : "Price"}</span>
-                    {many && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (p.id) setRemovedPrices((r) => [...r, p.id]);
-                          setPrices(prices.filter((x) => x.key !== p.key));
-                        }}
-                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className={many ? "" : "hidden"}>
-                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pn-${p.key}`}>
-                        Option name
-                      </label>
-                      <input id={`pn-${p.key}`} name="priceName" value={p.name} onChange={(e) => setPrice(p.key, { name: e.target.value })} required={many} className={input} placeholder="e.g. Size 7, Gold, 16 inch" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pa-${p.key}`}>
-                        Price ₹
-                      </label>
-                      <input id={`pa-${p.key}`} name="priceAmount" inputMode="decimal" required value={p.amount} onChange={(e) => setPrice(p.key, { amount: e.target.value })} className={input} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pc-${p.key}`}>
-                        Was ₹ (optional)
-                      </label>
-                      <input id={`pc-${p.key}`} name="priceCompare" inputMode="decimal" value={p.compare} onChange={(e) => setPrice(p.key, { compare: e.target.value })} className={input} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pt-${p.key}`}>
-                        Stock
-                      </label>
-                      <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-1.5">
-                        <select id={`pt-${p.key}`} name="priceTrack" value={p.track ? "yes" : "no"} onChange={(e) => setPrice(p.key, { track: e.target.value === "yes" })} className={`${input} px-2`}>
-                          <option value="no">Always in stock</option>
-                          <option value="yes">Track quantity</option>
-                        </select>
-                        <input name="priceQty" inputMode="numeric" value={p.qty} onChange={(e) => setPrice(p.key, { qty: e.target.value })} readOnly={!p.track} tabIndex={p.track ? undefined : -1} className={`${input} px-2 ${p.track ? "" : "opacity-40"}`} aria-label="Quantity in stock" placeholder="Qty" />
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            type="button"
-            onClick={() => {
-              // The first option needs a name too once there are two.
-              const first = prices[0];
-              const named = prices.length === 1 && first && (!first.name || first.name === product?.name) ? [{ ...first, name: "" }] : prices;
-              setPrices([...named, blankPrice()]);
-            }}
-            className={`${btn.outline} mt-3`}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" /> Add option
-          </button>
-        </section>
+        <VariantsEditor initial={variantsInitial} photos={images} />
 
         <PromisesPicker {...promises} />
 

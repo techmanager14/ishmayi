@@ -77,9 +77,12 @@ interface GhlProduct {
   availableInStore?: boolean;
   collectionIds?: string[];
   isLabelEnabled?: boolean;
+  /** Option types, e.g. { name: "Size", options: [{ id, name: "7" }] }. */
+  variants?: { id?: string; name?: string; options?: { id?: string; name?: string }[] }[];
 }
 interface GhlPrice {
   _id: string;
+  variantOptionIds?: string[];
   name?: string;
   amount?: number;
   currency?: string;
@@ -112,8 +115,28 @@ function variants(prices: GhlPrice[]): ProductVariant[] {
       const price = num(pr.amount)!;
       const compare = num(pr.compareAtPrice);
       const inStock = !pr.trackInventory || pr.allowOutOfStockPurchases || (pr.availableQuantity ?? 0) > 0;
-      return { id: pr._id, title: pr.name || "Default", price, compareAtPrice: compare && compare > price ? compare : null, available: isInr(pr) && inStock };
+      return { id: pr._id, title: pr.name || "Default", price, compareAtPrice: compare && compare > price ? compare : null, available: isInr(pr) && inStock, options: [], images: [] };
     });
+}
+
+/**
+ * The product's options (Size, Colour…) and each price's values, when every price is a
+ * full combination of them. Otherwise none (the site shows a plain list of choices).
+ */
+function withOptions(p: GhlProduct, prices: GhlPrice[], list: ProductVariant[]) {
+  const types = (p.variants ?? [])
+    .map((t) => ({ id: t.id ?? "", name: (t.name ?? "").trim(), values: (t.options ?? []).filter((o) => o.id && o.name).map((o) => ({ id: o.id!, name: o.name!.trim() })) }))
+    .filter((t) => t.name && t.values.length);
+  if (!types.length) return { options: [], variants: list };
+  const byId = new Map(prices.map((pr) => [pr._id, pr.variantOptionIds ?? []]));
+  const variants = list.map((v) => {
+    const ids = byId.get(v.id) ?? [];
+    return { ...v, options: types.map((t) => t.values.find((x) => ids.includes(x.id))?.name ?? "") };
+  });
+  if (variants.some((v) => v.options.some((x) => !x))) return { options: [], variants: list };
+  // Only values that some variant uses, in the admin's order.
+  const options = types.map((t, i) => ({ name: t.name, values: t.values.map((x) => x.name).filter((name) => variants.some((v) => v.options[i] === name)) }));
+  return { options, variants };
 }
 // Payments are taken in rupees, so only INR prices can be bought.
 const isInr = (pr: GhlPrice) => !pr.currency || pr.currency.toUpperCase() === "INR";
@@ -283,9 +306,14 @@ export const ghlProvider: CatalogProvider = {
     // Single-product lookup: includes the photo gallery, and finds brand-new products immediately.
     const raw = await ghl<GhlProduct & { product?: GhlProduct }>(`/products/${encodeURIComponent(handle)}`, {}, { fresh: opts?.fresh, ttl: PRODUCT_TTL });
     const p = raw?.product ?? raw;
-    if (!p?._id || p.availableInStore === false) return null;
-    if (!(await onSaleIds())?.has(p._id)) return null; // not in an on-sale collection
-    const v = variants((await pricesFor(p._id, opts?.fresh, PRODUCT_TTL)) ?? []);
+    if (!p?._id) return null;
+    // Admin preview shows products that aren't on sale yet.
+    if (!opts?.preview) {
+      if (p.availableInStore === false) return null;
+      if (!(await onSaleIds())?.has(p._id)) return null; // not in an on-sale collection
+    }
+    const prices = (await pricesFor(p._id, opts?.fresh, PRODUCT_TTL)) ?? [];
+    const { options, variants: v } = withOptions(p, prices, variants(prices));
     if (v.length === 0) return null;
     const { title, subtitle } = splitTitle(p.name ?? "Untitled");
     const detail: ProductDetail = {
@@ -298,6 +326,7 @@ export const ghlProvider: CatalogProvider = {
       showVariantPicker: v.length > 1,
       // e.g. bangles: "Size 2.4" / "Red & Gold · Size 2.6"
       optionName: v.every((x) => /\bsize\b/i.test(x.title)) ? (v.some((x) => x.title.includes("·")) ? "Colour & size" : "Size") : "Option",
+      options,
     };
     return detail;
   },

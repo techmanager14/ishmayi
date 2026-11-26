@@ -248,6 +248,14 @@ export interface AdminPrice {
   compareAtPrice: number | null;
   trackInventory: boolean;
   availableQuantity: number | null;
+  /** This variant's value for each product option, in option order (empty for simple products). */
+  optionValues: string[];
+}
+
+/** An option type with its values, e.g. Size: 6, 7, 8. */
+export interface AdminOption {
+  name: string;
+  values: string[];
 }
 
 export interface AdminProduct {
@@ -258,8 +266,11 @@ export interface AdminProduct {
   images: string[];
   availableInStore: boolean;
   collectionIds: string[];
+  options: AdminOption[];
   prices: AdminPrice[];
 }
+
+type RawVariantType = { id?: string; name?: string; options?: { id?: string; name?: string }[] };
 
 interface RawProduct {
   _id: string;
@@ -270,9 +281,11 @@ interface RawProduct {
   availableInStore?: boolean;
   collectionIds?: string[];
   productType?: string;
+  variants?: RawVariantType[];
 }
 interface RawPrice {
   _id: string;
+  variantOptionIds?: string[];
   name?: string;
   amount?: number;
   compareAtPrice?: number;
@@ -362,6 +375,9 @@ export async function getAdminProduct(id: string): Promise<AdminProduct | null> 
   const prices = await ghlApi<{ prices?: RawPrice[] }>("GET", `/products/${encodeURIComponent(id)}/price`, { query: { locationId: locationId(), limit: 100 } });
   const images = [...(raw.medias ?? [])].filter((m) => m.url && (!m.type || m.type === "image")).map((m) => m.url!);
   if (raw.image && !images.includes(raw.image)) images.unshift(raw.image);
+  const types = (raw.variants ?? [])
+    .map((t) => ({ name: (t.name ?? "").trim(), values: (t.options ?? []).filter((o) => o.id && o.name).map((o) => ({ id: o.id!, name: o.name!.trim() })) }))
+    .filter((t) => t.name && t.values.length);
   return {
     id: raw._id,
     name: raw.name ?? "",
@@ -370,6 +386,7 @@ export async function getAdminProduct(id: string): Promise<AdminProduct | null> 
     images,
     availableInStore: raw.availableInStore !== false,
     collectionIds: raw.collectionIds ?? [],
+    options: types.map((t) => ({ name: t.name, values: t.values.map((v) => v.name) })),
     prices: (prices.prices ?? [])
       .filter((p) => p.type !== "recurring")
       .map((p) => ({
@@ -379,6 +396,7 @@ export async function getAdminProduct(id: string): Promise<AdminProduct | null> 
         compareAtPrice: p.compareAtPrice ?? null,
         trackInventory: p.trackInventory === true,
         availableQuantity: p.availableQuantity ?? null,
+        optionValues: types.map((t) => t.values.find((v) => (p.variantOptionIds ?? []).includes(v.id))?.name ?? ""),
       })),
   };
 }
@@ -389,6 +407,17 @@ export interface ProductInput {
   availableInStore: boolean;
   collectionIds: string[];
   images: string[];
+  /** Option types in GHL's shape (ids from optionIds()); empty for a simple product. */
+  variants: { id: string; name: string; options: { id: string; name: string }[] }[];
+}
+
+/** Stable GHL ids for options and their values, from their names. */
+export function optionIds(options: AdminOption[]) {
+  const slug = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
+  return options.map((o, i) => {
+    const id = `opt${i + 1}-${slug(o.name) || "x"}`;
+    return { id, name: o.name, options: o.values.map((v, j) => ({ id: `${id}--${slug(v) || "v"}${j + 1}`, name: v })) };
+  });
 }
 
 const productBody = (p: ProductInput) => ({
@@ -400,6 +429,7 @@ const productBody = (p: ProductInput) => ({
   image: p.images[0] ?? "",
   medias: p.images.map((url, i) => ({ id: `m${i}-${url.slice(-12).replace(/\W/g, "")}`, title: `${p.name} ${i + 1}`, url, type: "image", isFeatured: i === 0 })),
   collectionIds: p.collectionIds,
+  variants: p.variants,
 });
 
 /** Creates the product (its prices/options are added with savePrice). */
@@ -420,12 +450,13 @@ export const deleteProduct = (id: string) => ghlApi("DELETE", `/products/${encod
 export async function savePrice(
   productId: string,
   priceId: string | null,
-  p: { name: string; amount: number; compareAtPrice: number | null; trackInventory: boolean; availableQuantity: number | null },
+  p: { name: string; amount: number; compareAtPrice: number | null; trackInventory: boolean; availableQuantity: number | null; variantOptionIds?: string[] },
 ) {
   const body = {
     product: productId,
     locationId: locationId(),
     name: p.name,
+    variantOptionIds: p.variantOptionIds ?? [],
     type: "one_time",
     currency: "INR",
     amount: p.amount,

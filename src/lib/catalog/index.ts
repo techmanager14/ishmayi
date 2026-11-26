@@ -20,6 +20,13 @@ export const getProduct = cache(async (handle: string, fresh = false): Promise<P
   return p ? { ...p, purchasable: true } : null;
 });
 
+/** Admin preview: any product, even hidden or not in a category; live data; can't be bought. */
+export async function previewProduct(handle: string): Promise<ProductDetail | null> {
+  if (!isGhlId(handle) || !ghlConfigured()) return null;
+  const p = await ghlProvider.product(handle, { fresh: true, preview: true });
+  return p ? { ...p, purchasable: false } : null;
+}
+
 /** Ordering is open once the GHL store is connected. */
 export const checkoutAllowed = async () => ghlConfigured();
 

@@ -23,6 +23,8 @@ import {
   deleteAppointment,
   deleteProduct,
   deletePrice,
+  getAdminProduct,
+  optionIds,
   savePrice,
   updateOpportunity,
   updateProduct,
@@ -33,7 +35,8 @@ import {
 import { textToHtml } from "@/lib/admin/text";
 import { GHL_TAG, resetGhlListing } from "@/lib/catalog/ghl";
 import { CMS_TAG, getCmsFresh, saveCms, updateCms } from "@/lib/cms";
-import { PROMISE_PRESETS, cleanProductCode, normaliseCms, type CmsContent } from "@/lib/cms-types";
+import { PROMISE_PRESETS, cleanProductCode, normaliseCms, variantKey, type CmsContent } from "@/lib/cms-types";
+import { parsePricing } from "@/lib/admin/pricing";
 import { setReward } from "@/lib/customer/rewards";
 import { CLAIM_STATUSES, orderMoney } from "@/lib/admin/claims";
 import { CLAIM_UPDATE_PREFIX } from "@/lib/claims";
@@ -274,31 +277,33 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
     collectionIds: form.getAll("collectionIds").map(String).filter(Boolean),
     images,
   };
-  // Options (sizes / variants): each row is one GHL price.
+  // Prices and options: one GHL price per variant (or a single price for a simple product).
   const col = (k: string) => form.getAll(k).map(String);
-  const [ids, names, amounts, compares, tracks, qtys] = ["priceId", "priceName", "priceAmount", "priceCompare", "priceTrack", "priceQty"].map(col);
-  const options = ids.map((priceId, i) => {
-    const track = tracks[i] === "yes";
-    return {
-      priceId: priceId || null,
-      name: (names[i] ?? "").trim().slice(0, 100),
-      amount: money(amounts[i] ?? ""),
-      compareAtPrice: money(compares[i] ?? ""),
-      trackInventory: track,
-      availableQuantity: track ? Math.max(0, Math.floor(Number(qtys[i] ?? 0) || 0)) : null,
-    };
-  });
-  if (!options.length) return fail("Add at least one price.");
-  if (options.some((o) => !o.amount)) return fail("Every option needs a price.");
-  if (options.length > 1 && options.some((o) => !o.name)) return fail("Give each option a name, e.g. Size 7 or Gold.");
-  const named = options.map((o) => ({ ...o, amount: o.amount!, name: o.name || name }));
-  const removed = col("priceDelete").filter((x) => /^[\w-]{6,64}$/.test(x));
+  let pricingRaw: unknown;
+  try {
+    pricingRaw = JSON.parse(String(form.get("pricing") ?? "{}"));
+  } catch {
+    return fail("The prices couldn't be read. Please reload and try again.");
+  }
+  const pricing = parsePricing(pricingRaw);
+  if (!pricing.ok) return fail(pricing.message);
+  const types = optionIds(pricing.options);
+  const valueId = (i: number, value: string) => types[i].options.find((o) => o.name === value)!.id;
 
   try {
-    const productId = id || (await createProduct(input));
-    if (id) await updateProduct(id, input);
-    for (const priceId of removed) await deletePrice(productId, priceId);
-    for (const o of named) await savePrice(productId, o.priceId, o);
+    const productId = id || (await createProduct({ ...input, variants: types }));
+    if (id) await updateProduct(id, { ...input, variants: types });
+    // Prices no longer in the list (removed or switched off) are deleted.
+    const existing = id ? ((await getAdminProduct(id))?.prices ?? []).map((p) => p.id) : [];
+    const kept = new Set(pricing.rows.map((r) => r.priceId).filter(Boolean));
+    for (const priceId of existing.filter((x) => !kept.has(x))) await deletePrice(productId, priceId);
+    for (const r of pricing.rows) {
+      await savePrice(productId, r.priceId, {
+        ...r,
+        name: r.values.length ? variantKey(r.values) : name,
+        variantOptionIds: r.values.map((v, i) => valueId(i, v)),
+      });
+    }
 
     // Website extras (promises, code, perfect match) in one read-and-write, so nothing is overwritten.
     await updateCms((cms) => {
@@ -318,6 +323,12 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
         next.productCodes = codes;
       }
       if (form.get("pairingsEditable") === "1") next.pairings = withPairings(cms.pairings, productId, col("pairWith"));
+      // Photos chosen per variant.
+      const photos = Object.fromEntries(pricing.rows.filter((r) => r.values.length && r.images.length).map((r) => [variantKey(r.values), r.images]));
+      const variantImages = { ...cms.variantImages };
+      if (Object.keys(photos).length) variantImages[productId] = photos;
+      else delete variantImages[productId];
+      next.variantImages = variantImages;
       return normaliseCms(next);
     });
     updateTag(CMS_TAG);
@@ -357,10 +368,12 @@ export async function deleteProductAction(form: FormData) {
     await updateCms((cms) => {
       const promises = { ...cms.promises };
       const productCodes = { ...cms.productCodes };
+      const variantImages = { ...cms.variantImages };
       delete promises[id];
       delete productCodes[id];
+      delete variantImages[id];
       const pairings = Object.fromEntries(Object.entries(withPairings(cms.pairings, id, [])).filter(([k]) => k !== id));
-      return normaliseCms({ ...cms, promises, productCodes, pairings });
+      return normaliseCms({ ...cms, promises, productCodes, pairings, variantImages });
     })
       .then(() => updateTag(CMS_TAG))
       .catch((err) => console.warn(`[admin] product ${id} deleted, extras not cleared: ${errorText(err)}`));

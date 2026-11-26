@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { deleteProductAction } from "@/app/admin/actions";
 import { ConfirmButton } from "@/components/admin/forms";
 import { ProductForm } from "@/components/admin/ProductForm";
-import { PageTitle } from "@/components/admin/ui";
+import { PageTitle, btn } from "@/components/admin/ui";
+import { Eye } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminProduct, siteCollections } from "@/lib/admin/data";
 import { htmlToText } from "@/lib/admin/text";
@@ -30,10 +31,15 @@ export default async function EditProductPage({ params, searchParams }: { params
           </Link>
         }
         actions={
-          <form action={deleteProductAction}>
-            <input type="hidden" name="id" value={product.id} />
-            <ConfirmButton message={`Delete “${product.name}” from the store? This can't be undone.`}>Delete product</ConfirmButton>
-          </form>
+          <>
+            <a href={`/preview/${product.id}`} target="_blank" rel="noopener" className={btn.outline}>
+              <Eye className="h-4 w-4" aria-hidden="true" /> Preview
+            </a>
+            <form action={deleteProductAction}>
+              <input type="hidden" name="id" value={product.id} />
+              <ConfirmButton message={`Delete “${product.name}” from the store? This can't be undone.`}>Delete product</ConfirmButton>
+            </form>
+          </>
         }
       />
       {saved && <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Product created.</p>}
@@ -47,6 +53,7 @@ export default async function EditProductPage({ params, searchParams }: { params
           library: cms.promiseLibrary,
         }}
         code={cms.productCodes[product.id] ?? ""}
+        variantImages={cms.variantImages[product.id] ?? {}}
         pairing={{
           selected: cms.pairings[product.id] ?? [],
           options: (all ?? []).filter((p) => p.handle !== product.id).map((p) => ({ handle: p.handle, title: p.title, image: p.image?.src ?? null, price: p.price })),

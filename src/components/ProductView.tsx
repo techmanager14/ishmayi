@@ -9,7 +9,7 @@ import { cart } from "@/lib/cart";
 import { flyToBag } from "@/lib/fly-to-bag";
 import { productCode } from "@/lib/catalog/text";
 import type { PairItem } from "@/lib/catalog/pairs";
-import type { ProductDetail, StoreProduct } from "@/lib/catalog/types";
+import type { ProductDetail, ProductImage, StoreProduct } from "@/lib/catalog/types";
 import { shippingLabel, waLink } from "@/lib/cms-types";
 import { thumbUrl } from "@/lib/images";
 import type { ProductPromise } from "@/lib/promises";
@@ -114,6 +114,20 @@ export function ProductView({
   const [addedMatches, setAddedMatches] = useState<string[]>([]);
 
   const variant = p.variants.find((v) => v.id === variantId) ?? p.variants[0];
+  // The chosen variant's own photos when the admin picked some, otherwise the product's.
+  const photos: ProductImage[] = variant.images.length ? variant.images.map((src) => ({ src, alt: `${p.title}, ${variant.title}` })) : p.images;
+  const hasOptions = p.options.length > 0;
+  /** Choose a value for one option, keeping the other choices where that combination exists. */
+  const choose = (index: number, value: string) => {
+    const want = variant.options.map((v, i) => (i === index ? value : v));
+    const exact = p.variants.find((v) => v.options.every((x, i) => x === want[i]));
+    const near = p.variants.filter((v) => v.options[index] === value).sort((a, b) => Number(b.available) - Number(a.available))[0];
+    const next = exact ?? near;
+    if (next) {
+      setVariantId(next.id);
+      setAdded(false);
+    }
+  };
   const off = variant.compareAtPrice ? Math.round((1 - variant.price / variant.compareAtPrice) * 100) : 0;
   const canBuy = variant.available && store.ordersOpen;
   const code = savedCode || productCode(p.subtitle);
@@ -148,8 +162,8 @@ export function ProductView({
     if (zoom === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setZoom(null);
-      if (e.key === "ArrowRight") setZoom((z) => (z === null ? z : (z + 1) % p.images.length));
-      if (e.key === "ArrowLeft") setZoom((z) => (z === null ? z : (z - 1 + p.images.length) % p.images.length));
+      if (e.key === "ArrowRight") setZoom((z) => (z === null ? z : (z + 1) % photos.length));
+      if (e.key === "ArrowLeft") setZoom((z) => (z === null ? z : (z - 1 + photos.length) % photos.length));
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -158,7 +172,13 @@ export function ProductView({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [zoom, p.images.length]);
+  }, [zoom, photos.length]);
+
+  // A different variant may have different photos: start from its first one.
+  useEffect(() => {
+    setImageIndex(0);
+    gallery.current?.scrollTo({ left: 0 });
+  }, [variantId]);
 
   const goTo = (i: number) => {
     setImageIndex(i);
@@ -167,7 +187,7 @@ export function ProductView({
   };
 
   const addToBag = () => {
-    cart.add({ productId: p.handle, variantId: variant.id, title: p.title, variantTitle: p.showVariantPicker ? variant.title : null, image: p.images[0]?.src ?? null, price: variant.price }, qty);
+    cart.add({ productId: p.handle, variantId: variant.id, title: p.title, variantTitle: p.showVariantPicker ? variant.title : null, image: photos[0]?.src ?? null, price: variant.price }, qty);
     track("add_to_cart", { location: "product_page", product: p.handle });
   };
   const onAdd = (e: MouseEvent<HTMLElement>) => {
@@ -178,7 +198,7 @@ export function ProductView({
     const photo = gallery.current?.querySelectorAll("img")[imageIndex];
     const r = photo?.getBoundingClientRect();
     const photoVisible = r && r.bottom > 80 && r.top < window.innerHeight - 80;
-    flyToBag(p.images[imageIndex] ? thumbUrl(p.images[imageIndex].src, 240) : null, photoVisible ? photo! : e.currentTarget);
+    flyToBag(photos[imageIndex] ? thumbUrl(photos[imageIndex].src, 240) : null, photoVisible ? photo! : e.currentTarget);
   };
   /** Perfect match: this piece (if not in the bag yet) plus its match, then show the bag. */
   const addBoth = (m: PairItem) => {
@@ -226,7 +246,7 @@ export function ProductView({
               }}
               className="no-scrollbar flex aspect-square snap-x snap-mandatory overflow-x-auto bg-ivory-deep md:rounded-2xl"
             >
-              {p.images.map((img, i) => (
+              {photos.map((img, i) => (
                 <button key={img.src} type="button" onClick={() => setZoom(i)} aria-label={`View image ${i + 1} full screen`} className="h-full w-full shrink-0 snap-center cursor-zoom-in">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={thumbUrl(img.src, 1080)} alt={i === 0 ? img.alt : `${img.alt}, view ${i + 1}`} loading={i === 0 ? "eager" : "lazy"} draggable={false} className="h-full w-full object-contain" />
@@ -237,29 +257,29 @@ export function ProductView({
             <button type="button" onClick={() => setZoom(imageIndex)} aria-label="View full screen" className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-sm hover:text-burgundy">
               <Expand className="h-[18px] w-[18px]" aria-hidden="true" />
             </button>
-            {p.images.length > 1 && (
+            {photos.length > 1 && (
               <span className="absolute bottom-3 left-3 hidden rounded-full bg-black/55 px-2.5 py-1 text-xs font-bold text-white md:block">
-                {imageIndex + 1} / {p.images.length}
+                {imageIndex + 1} / {photos.length}
               </span>
             )}
           </div>
           {/* Phones: dots under the photo; swipe to change it. */}
-          {p.images.length > 1 && p.images.length <= 10 && (
+          {photos.length > 1 && photos.length <= 10 && (
             <div className="mt-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
-              {p.images.map((img, i) => (
+              {photos.map((img, i) => (
                 <span key={img.src} className={`h-1.5 rounded-full transition-all ${i === imageIndex ? "w-5 bg-burgundy" : "w-1.5 bg-charcoal/25"}`} />
               ))}
             </div>
           )}
           {/* Too many photos for dots on a phone: a counter instead. */}
-          {p.images.length > 10 && (
+          {photos.length > 10 && (
             <p className="mt-2 text-center text-xs font-bold text-ink-muted md:hidden" aria-hidden="true">
-              {imageIndex + 1} / {p.images.length}
+              {imageIndex + 1} / {photos.length}
             </p>
           )}
-          {p.images.length > 1 && (
+          {photos.length > 1 && (
             <div className="no-scrollbar mt-3 hidden gap-2 overflow-x-auto md:flex">
-              {p.images.map((img, i) => (
+              {photos.map((img, i) => (
                 <button key={img.src} type="button" onClick={() => goTo(i)} aria-label={`Show image ${i + 1}`} aria-current={i === imageIndex} className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === imageIndex ? "border-burgundy" : "border-transparent opacity-70 hover:opacity-100"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={thumbUrl(img.src, 160)} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -295,7 +315,40 @@ export function ProductView({
             </p>
           </div>
 
-          {p.showVariantPicker && (
+          {hasOptions &&
+            p.options.map((o, i) => (
+              <fieldset key={o.name} className="mt-5">
+                <legend className="text-sm font-bold text-charcoal">
+                  {o.name}: <span className="font-semibold text-ink-muted">{variant.options[i]}</span>
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {o.values.map((value) => {
+                    // Is there a variant with this value and the other current choices? Is it in stock?
+                    const match = p.variants.find((v) => v.options.every((x, j) => (j === i ? x === value : x === variant.options[j])));
+                    const selected = variant.options[i] === value;
+                    const thumb = o.values.length <= 12 ? p.variants.find((v) => v.options[i] === value && v.images[0])?.images[0] : undefined;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => choose(i, value)}
+                        aria-pressed={selected}
+                        title={!match ? "Not available in this combination" : !match.available ? "Sold out" : undefined}
+                        className={`flex items-center gap-2 rounded-xl border-2 py-1.5 text-sm font-semibold transition-colors ${thumb ? "pr-3 pl-1.5" : "px-4 py-2"} ${
+                          selected ? "border-burgundy bg-blush text-burgundy" : "border-parchment text-charcoal hover:border-charcoal/50"
+                        } ${!match ? "border-dashed opacity-45" : !match.available ? "text-ink-muted line-through" : ""}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {thumb && <img src={thumbUrl(thumb, 80)} alt="" className="h-8 w-8 rounded-lg object-cover" />}
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+
+          {p.showVariantPicker && !hasOptions && (
             <fieldset className="mt-5">
               <legend className="text-sm font-bold text-charcoal">{p.optionName}</legend>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -376,7 +429,7 @@ export function ProductView({
                     <li key={m.handle} className="flex items-center gap-3">
                       <span className="flex shrink-0 items-center gap-1">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {p.images[0] ? <img src={thumbUrl(p.images[0].src, 160)} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <span className="h-14 w-14 rounded-xl bg-ivory-deep" />}
+                        {photos[0] ? <img src={thumbUrl(photos[0].src, 160)} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <span className="h-14 w-14 rounded-xl bg-ivory-deep" />}
                         <Plus className="h-4 w-4 text-gold-deep" aria-hidden="true" />
                         <Link href={`/product/${m.handle}`} className="block">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -488,7 +541,7 @@ export function ProductView({
         <div className="fixed inset-0 z-[80] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label="Product photos">
           <div className="flex items-center justify-between p-3 text-white">
             <span className="text-sm font-bold">
-              {zoom + 1} / {p.images.length}
+              {zoom + 1} / {photos.length}
             </span>
             <button type="button" onClick={() => setZoom(null)} aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10">
               <X className="h-6 w-6" aria-hidden="true" />
@@ -496,13 +549,13 @@ export function ProductView({
           </div>
           <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 pb-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={thumbUrl(p.images[zoom].src, 1600)} alt={p.images[zoom].alt} className="max-h-full max-w-full object-contain" />
-            {p.images.length > 1 && (
+            <img src={thumbUrl(photos[zoom].src, 1600)} alt={photos[zoom].alt} className="max-h-full max-w-full object-contain" />
+            {photos.length > 1 && (
               <>
-                <button type="button" onClick={() => setZoom((zoom - 1 + p.images.length) % p.images.length)} aria-label="Previous photo" className="absolute left-2 flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
+                <button type="button" onClick={() => setZoom((zoom - 1 + photos.length) % photos.length)} aria-label="Previous photo" className="absolute left-2 flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
                   <ChevronLeft className="h-6 w-6" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => setZoom((zoom + 1) % p.images.length)} aria-label="Next photo" className="absolute right-2 flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
+                <button type="button" onClick={() => setZoom((zoom + 1) % photos.length)} aria-label="Next photo" className="absolute right-2 flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
                   <ChevronRight className="h-6 w-6" aria-hidden="true" />
                 </button>
               </>

@@ -32,6 +32,7 @@ export default async function NewProductPage() {
         categories={cats.map((c) => ({ label: c.label, onSale: c.onSale, collectionId: c.collection?.id ?? null }))}
         promises={{ selected: DEFAULT_PROMISES, presets: PROMISE_PRESETS.map((id) => ({ id, label: promiseLabel(id, cms.store) })), library: cms.promiseLibrary }}
         code=""
+        variantImages={{}}
       />
     </>
   );

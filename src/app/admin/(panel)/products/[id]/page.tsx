@@ -44,7 +44,9 @@ export default async function EditProductPage({ params, searchParams }: { params
         promises={{
           selected: cms.promises[product.id] ?? DEFAULT_PROMISES,
           presets: PROMISE_PRESETS.map((id) => ({ id, label: promiseLabel(id, cms.store) })),
+          library: cms.promiseLibrary,
         }}
+        code={cms.productCodes[product.id] ?? ""}
         pairing={{
           selected: cms.pairings[product.id] ?? [],
           options: (all ?? []).filter((p) => p.handle !== product.id).map((p) => ({ handle: p.handle, title: p.title, image: p.image?.src ?? null, price: p.price })),

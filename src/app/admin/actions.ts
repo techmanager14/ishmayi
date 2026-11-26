@@ -22,6 +22,7 @@ import {
   createProduct,
   deleteAppointment,
   deleteProduct,
+  deletePrice,
   savePrice,
   updateOpportunity,
   updateProduct,
@@ -31,8 +32,8 @@ import {
 } from "@/lib/admin/data";
 import { textToHtml } from "@/lib/admin/text";
 import { GHL_TAG, resetGhlListing } from "@/lib/catalog/ghl";
-import { CMS_TAG, getCmsFresh, saveCms } from "@/lib/cms";
-import { normaliseCms, type CmsContent } from "@/lib/cms-types";
+import { CMS_TAG, getCmsFresh, saveCms, updateCms } from "@/lib/cms";
+import { PROMISE_PRESETS, cleanProductCode, normaliseCms, type CmsContent } from "@/lib/cms-types";
 import { setReward } from "@/lib/customer/rewards";
 import { CLAIM_STATUSES, orderMoney } from "@/lib/admin/claims";
 import { CLAIM_UPDATE_PREFIX } from "@/lib/claims";
@@ -273,31 +274,57 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
     collectionIds: form.getAll("collectionIds").map(String).filter(Boolean),
     images,
   };
+  // Options (sizes / variants): each row is one GHL price.
+  const col = (k: string) => form.getAll(k).map(String);
+  const [ids, names, amounts, compares, tracks, qtys] = ["priceId", "priceName", "priceAmount", "priceCompare", "priceTrack", "priceQty"].map(col);
+  const options = ids.map((priceId, i) => {
+    const track = tracks[i] === "yes";
+    return {
+      priceId: priceId || null,
+      name: (names[i] ?? "").trim().slice(0, 100),
+      amount: money(amounts[i] ?? ""),
+      compareAtPrice: money(compares[i] ?? ""),
+      trackInventory: track,
+      availableQuantity: track ? Math.max(0, Math.floor(Number(qtys[i] ?? 0) || 0)) : null,
+    };
+  });
+  if (!options.length) return fail("Add at least one price.");
+  if (options.some((o) => !o.amount)) return fail("Every option needs a price.");
+  if (options.length > 1 && options.some((o) => !o.name)) return fail("Give each option a name, e.g. Size 7 or Gold.");
+  const named = options.map((o) => ({ ...o, amount: o.amount!, name: o.name || name }));
+  const removed = col("priceDelete").filter((x) => /^[\w-]{6,64}$/.test(x));
+
   try {
+    const productId = id || (await createProduct(input));
+    if (id) await updateProduct(id, input);
+    for (const priceId of removed) await deletePrice(productId, priceId);
+    for (const o of named) await savePrice(productId, o.priceId, o);
+
+    // Website extras (promises, code, perfect match) in one read-and-write, so nothing is overwritten.
+    await updateCms((cms) => {
+      const next = { ...cms };
+      if (form.get("promisesEditable") === "1") {
+        next.promises = { ...cms.promises, [productId]: col("promise") };
+        next.promiseLibrary = col("promiseLibrary");
+        // A promise deleted from the list is taken off every product.
+        const keep = new Set([...next.promiseLibrary, ...PROMISE_PRESETS].map((x) => x.toLowerCase()));
+        next.promises = Object.fromEntries(Object.entries(next.promises).map(([k, list]) => [k, list.filter((x) => keep.has(x.toLowerCase()))]));
+      }
+      if (form.has("productCode")) {
+        const code = cleanProductCode(form.get("productCode"));
+        const codes = { ...cms.productCodes };
+        if (code) codes[productId] = code;
+        else delete codes[productId];
+        next.productCodes = codes;
+      }
+      if (form.get("pairingsEditable") === "1") next.pairings = withPairings(cms.pairings, productId, col("pairWith"));
+      return normaliseCms(next);
+    });
+    updateTag(CMS_TAG);
     if (!id) {
-      const amount = money(str(form, "amount", 20));
-      if (!amount) return fail("Enter a price.");
-      const newId = await createProduct(input, { amount, compareAtPrice: money(str(form, "compareAtPrice", 20)) });
-      if (form.get("promisesEditable") === "1") await savePromises(newId, form.getAll("promise").map(String));
       refreshStore();
-      redirect(`/admin/products/${newId}?saved=1`);
+      redirect(`/admin/products/${productId}?saved=1`);
     }
-    await updateProduct(id, input);
-    const priceIds = form.getAll("priceId").map(String);
-    for (const [i, priceId] of priceIds.entries()) {
-      const amount = money(String(form.getAll("priceAmount")[i] ?? ""));
-      if (amount === null) return fail("Every price needs an amount.");
-      const track = String(form.getAll("priceTrack")[i] ?? "") === "yes";
-      await savePrice(id, priceId || null, {
-        name: String(form.getAll("priceName")[i] ?? "").trim() || name,
-        amount,
-        compareAtPrice: money(String(form.getAll("priceCompare")[i] ?? "")),
-        trackInventory: track,
-        availableQuantity: track ? Math.max(0, Math.floor(Number(form.getAll("priceQty")[i] ?? 0) || 0)) : null,
-      });
-    }
-    if (form.get("pairingsEditable") === "1") await savePairings(id, form.getAll("pairWith").map(String));
-    if (form.get("promisesEditable") === "1") await savePromises(id, form.getAll("promise").map(String));
   } catch (err) {
     if (err && typeof err === "object" && "digest" in err) throw err; // redirect()
     return fail(errorText(err));
@@ -308,32 +335,36 @@ export async function saveProductAction(_: ActionState | undefined, form: FormDa
   return { ok: true, message: "Saved. The website updates within a few seconds." };
 }
 
-/** The promises shown on this product's page (an empty list hides the row). */
-async function savePromises(id: string, chosen: string[]) {
-  const cms = await getCmsFresh();
-  await saveCms(normaliseCms({ ...cms, promises: { ...cms.promises, [id]: chosen } }));
-  updateTag(CMS_TAG);
-}
-
 /** Perfect match is two-way: ticking B on A also lists A on B, and unticking removes both. */
-async function savePairings(id: string, chosen: string[]) {
+function withPairings(current: Record<string, string[]>, id: string, chosen: string[]) {
   const picked = [...new Set(chosen.filter((x) => /^[\w-]{6,64}$/.test(x) && x !== id))].slice(0, 8);
-  const cms = await getCmsFresh();
-  const pairings: Record<string, string[]> = { ...cms.pairings, [id]: picked };
+  const pairings: Record<string, string[]> = { ...current, [id]: picked };
   for (const [other, list] of Object.entries(pairings)) {
     if (other === id) continue;
     if (picked.includes(other) && !list.includes(id)) pairings[other] = [...list, id].slice(0, 8);
     if (!picked.includes(other) && list.includes(id)) pairings[other] = list.filter((x) => x !== id);
   }
   for (const other of picked) if (!pairings[other]) pairings[other] = [id];
-  await saveCms(normaliseCms({ ...cms, pairings }));
-  updateTag(CMS_TAG);
+  return pairings;
 }
 
 export async function deleteProductAction(form: FormData) {
   await requireAdmin();
   const id = str(form, "id", 64);
-  if (id) await deleteProduct(id);
+  if (id) {
+    await deleteProduct(id);
+    // Forget its website extras (code, promises, perfect matches). Best effort: the product is already gone.
+    await updateCms((cms) => {
+      const promises = { ...cms.promises };
+      const productCodes = { ...cms.productCodes };
+      delete promises[id];
+      delete productCodes[id];
+      const pairings = Object.fromEntries(Object.entries(withPairings(cms.pairings, id, [])).filter(([k]) => k !== id));
+      return normaliseCms({ ...cms, promises, productCodes, pairings });
+    })
+      .then(() => updateTag(CMS_TAG))
+      .catch((err) => console.warn(`[admin] product ${id} deleted, extras not cleared: ${errorText(err)}`));
+  }
   refreshStore();
   redirect("/admin/products?deleted=1");
 }

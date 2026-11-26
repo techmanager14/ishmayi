@@ -402,13 +402,16 @@ const productBody = (p: ProductInput) => ({
   collectionIds: p.collectionIds,
 });
 
-export async function createProduct(p: ProductInput, price: { amount: number; compareAtPrice: number | null }) {
+/** Creates the product (its prices/options are added with savePrice). */
+export async function createProduct(p: ProductInput) {
   const res = await ghlApi<{ _id?: string; product?: { _id?: string } }>("POST", "/products/", { body: productBody(p) });
   const id = res._id ?? res.product?._id;
   if (!id) throw new Error("GHL did not return a product id");
-  await savePrice(id, null, { name: p.name, ...price, trackInventory: false, availableQuantity: null });
   return id;
 }
+
+export const deletePrice = (productId: string, priceId: string) =>
+  ghlApi("DELETE", `/products/${encodeURIComponent(productId)}/price/${encodeURIComponent(priceId)}`, { query: { locationId: locationId() } });
 
 export const updateProduct = (id: string, p: ProductInput) => ghlApi("PUT", `/products/${encodeURIComponent(id)}`, { body: productBody(p) });
 

@@ -86,7 +86,20 @@ function OfferCode({ offer }: { offer: ProductOffer }) {
 }
 
 /** Product page body: gallery with full-screen view, options, buy buttons, offers and details. */
-export function ProductView({ product: p, offers = [], matches = [], promises = [] }: { product: ProductDetail; offers?: ProductOffer[]; matches?: PairItem[]; promises?: ProductPromise[] }) {
+export function ProductView({
+  product: p,
+  offers = [],
+  matches = [],
+  promises = [],
+  code: savedCode,
+}: {
+  product: ProductDetail;
+  offers?: ProductOffer[];
+  matches?: PairItem[];
+  promises?: ProductPromise[];
+  /** Product code set in the admin. */
+  code?: string;
+}) {
   const { store, contact } = useCms();
   const router = useRouter();
   const gallery = useRef<HTMLDivElement>(null);
@@ -103,7 +116,7 @@ export function ProductView({ product: p, offers = [], matches = [], promises = 
   const variant = p.variants.find((v) => v.id === variantId) ?? p.variants[0];
   const off = variant.compareAtPrice ? Math.round((1 - variant.price / variant.compareAtPrice) * 100) : 0;
   const canBuy = variant.available && store.ordersOpen;
-  const code = productCode(p.subtitle);
+  const code = savedCode || productCode(p.subtitle);
   const badges = badgesFor(`${p.title} ${p.subtitle ?? ""}`);
   const whatsapp = waLink(contact.whatsapp, `Hello Ishmayi, I'd like to know more about "${p.title}".`);
 
@@ -231,12 +244,18 @@ export function ProductView({ product: p, offers = [], matches = [], promises = 
             )}
           </div>
           {/* Phones: dots under the photo; swipe to change it. */}
-          {p.images.length > 1 && (
+          {p.images.length > 1 && p.images.length <= 10 && (
             <div className="mt-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
               {p.images.map((img, i) => (
                 <span key={img.src} className={`h-1.5 rounded-full transition-all ${i === imageIndex ? "w-5 bg-burgundy" : "w-1.5 bg-charcoal/25"}`} />
               ))}
             </div>
+          )}
+          {/* Too many photos for dots on a phone: a counter instead. */}
+          {p.images.length > 10 && (
+            <p className="mt-2 text-center text-xs font-bold text-ink-muted md:hidden" aria-hidden="true">
+              {imageIndex + 1} / {p.images.length}
+            </p>
           )}
           {p.images.length > 1 && (
             <div className="no-scrollbar mt-3 hidden gap-2 overflow-x-auto md:flex">

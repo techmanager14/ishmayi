@@ -102,7 +102,7 @@ function images(p: GhlProduct, alt: string): ProductImage[] {
   const media = [...(p.medias ?? [])].sort((a, b) => Number(!!b.isFeatured) - Number(!!a.isFeatured));
   for (const m of media) if (m.url && (!m.type || m.type === "image")) list.push({ src: m.url, alt: m.title || alt });
   if (p.image && !list.some((i) => i.src === p.image)) list.unshift({ src: p.image, alt });
-  return list.slice(0, 10);
+  return list.slice(0, 30);
 }
 
 function variants(prices: GhlPrice[]): ProductVariant[] {

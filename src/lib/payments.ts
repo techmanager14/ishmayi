@@ -37,6 +37,7 @@ export type PriceResult = { ok: true; lines: PricedLine[]; total: number } | { o
 export async function priceCart(input: unknown): Promise<PriceResult> {
   if (!Array.isArray(input) || input.length === 0) return { ok: false, code: "empty", message: "Your bag is empty." };
   if (input.length > 20) return { ok: false, code: "too_many", message: "Too many items in one order." };
+  const { productCodes } = await getCmsFresh();
 
   const lines: PricedLine[] = [];
   for (const raw of input as Partial<CheckoutLineInput>[]) {
@@ -55,11 +56,12 @@ export async function priceCart(input: unknown): Promise<PriceResult> {
     if (!variant.available)
       return { ok: false, code: "sold_out", productId, message: `${product.title} has just sold out. Please remove it to continue.` };
 
+    // The product code goes into the order, so the team can identify the piece.
+    const code = productCodes[productId] ?? productCode(product.subtitle);
     lines.push({
       productId,
       variantId,
-      // Fashion jewellery carries its code into the order, so the team can identify the piece.
-      title: productCode(product.subtitle) ? `${product.title} [${productCode(product.subtitle)}]` : product.title,
+      title: code ? `${product.title} [${code}]` : product.title,
       variantTitle: product.showVariantPicker ? variant.title : null,
       image: product.images[0]?.src ?? null,
       unitPrice: variant.price,

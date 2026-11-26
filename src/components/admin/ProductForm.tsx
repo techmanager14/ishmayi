@@ -1,7 +1,7 @@
 "use client";
 
-import { BadgeCheck, Check, Plus, Search, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { BadgeCheck, Check, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { saveProductAction } from "@/app/admin/actions";
 import { thumbUrl } from "@/lib/images";
 import { ActionForm, Submit } from "./forms";
@@ -21,25 +21,74 @@ export interface ProductFormProps {
   categories: { label: string; onSale: boolean; collectionId: string | null }[];
   /** Perfect match picker (existing products only). */
   pairing?: { selected: string[]; options: { handle: string; title: string; image: string | null; price: number | null }[] };
-  /** Promises shown on the product page: preset ids or custom text, plus the preset choices. */
-  promises: { selected: string[]; presets: { id: string; label: string }[] };
+  /** Promises: this product's choice, the built-in choices, and the admin's own saved list. */
+  promises: { selected: string[]; presets: { id: string; label: string }[]; library: string[] };
+  /** Product code (SKU) shown on the website. */
+  code: string;
 }
 
-const MAX_PROMISES = 6;
+interface PriceRow {
+  key: string;
+  id: string;
+  name: string;
+  amount: string;
+  compare: string;
+  track: boolean;
+  qty: string;
+}
+let rowSeq = 0;
+const blankPrice = (): PriceRow => ({ key: `new-${++rowSeq}`, id: "", name: "", amount: "", compare: "", track: false, qty: "" });
 
-function PromisesPicker({ selected, presets }: ProductFormProps["promises"]) {
+const MAX_PROMISES = 6;
+const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+function Chip({ on, disabled, onClick, children }: { on: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${on ? "border-burgundy bg-burgundy text-white" : "border-parchment bg-white text-charcoal hover:border-burgundy"}`}
+    >
+      {on ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
+      {children}
+    </button>
+  );
+}
+
+function PromisesPicker({ selected, presets, library: initialLibrary }: ProductFormProps["promises"]) {
   const [picked, setPicked] = useState(selected);
-  const [custom, setCustom] = useState("");
-  const presetIds = new Set(presets.map((p) => p.id));
-  const customs = picked.filter((x) => !presetIds.has(x));
+  // The admin's own promises, offered on every product. Anything already on this product is listed too.
+  const [library, setLibrary] = useState(() => {
+    const presetIds = new Set(presets.map((p) => p.id));
+    const extra = selected.filter((x) => !presetIds.has(x) && !initialLibrary.some((l) => same(l, x)));
+    return [...initialLibrary, ...extra];
+  });
+  const [text, setText] = useState("");
   const full = picked.length >= MAX_PROMISES;
-  const toggle = (id: string) => setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : full ? picked : [...picked, id]);
-  const addCustom = () => {
-    const text = custom.replace(/\s+/g, " ").trim().slice(0, 40);
-    if (!text || full || picked.some((x) => x.toLowerCase() === text.toLowerCase())) return;
-    setPicked([...picked, text]);
-    setCustom("");
+  const isOn = (v: string) => picked.some((x) => same(x, v));
+  const toggle = (v: string) => setPicked(isOn(v) ? picked.filter((x) => !same(x, v)) : full ? picked : [...picked, v]);
+  const query = text.replace(/\s+/g, " ").trim().slice(0, 40);
+  const suggestions = query ? library.filter((l) => l.toLowerCase().includes(query.toLowerCase()) && !isOn(l)).slice(0, 5) : [];
+
+  const add = (value = query) => {
+    if (!value || full) return;
+    const existing = library.find((l) => same(l, value)) ?? presets.find((p) => same(p.label, value))?.id;
+    if (existing) {
+      if (!isOn(existing)) setPicked([...picked, existing]);
+    } else {
+      setLibrary([...library, value]);
+      setPicked([...picked, value]);
+    }
+    setText("");
   };
+  const removeFromLibrary = (v: string) => {
+    if (!window.confirm(`Delete “${v}” from your promises? It will be removed from every product when you save.`)) return;
+    setLibrary(library.filter((l) => !same(l, v)));
+    setPicked(picked.filter((x) => !same(x, v)));
+  };
+
   return (
     <section className="rounded-2xl border border-parchment bg-panel p-5">
       <h2 className="flex items-center gap-2 text-base font-bold">
@@ -50,49 +99,64 @@ function PromisesPicker({ selected, presets }: ProductFormProps["promises"]) {
       {picked.map((x) => (
         <input key={x} type="hidden" name="promise" value={x} />
       ))}
+      {library.map((x) => (
+        <input key={x} type="hidden" name="promiseLibrary" value={x} />
+      ))}
       <ul className="mt-3 flex flex-wrap gap-2">
-        {presets.map((p) => {
-          const on = picked.includes(p.id);
-          return (
-            <li key={p.id}>
-              <button
-                type="button"
-                aria-pressed={on}
-                disabled={!on && full}
-                onClick={() => toggle(p.id)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${on ? "border-burgundy bg-burgundy text-white" : "border-parchment bg-white text-charcoal hover:border-burgundy"}`}
-              >
-                {on ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
-                {p.label}
-              </button>
-            </li>
-          );
-        })}
-        {customs.map((c) => (
-          <li key={c} className="flex items-center gap-1 rounded-full border border-burgundy bg-burgundy py-1.5 pr-1.5 pl-3 text-xs font-semibold text-white">
-            {c}
-            <button type="button" onClick={() => setPicked(picked.filter((x) => x !== c))} aria-label={`Remove ${c}`} className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/20">
-              <X className="h-3 w-3" aria-hidden="true" />
-            </button>
+        {presets.map((p) => (
+          <li key={p.id}>
+            <Chip on={isOn(p.id)} disabled={!isOn(p.id) && full} onClick={() => toggle(p.id)}>
+              {p.label}
+            </Chip>
           </li>
         ))}
       </ul>
-      <div className="mt-3 flex gap-2">
-        <input
-          value={custom}
-          maxLength={40}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-          placeholder="Your own, e.g. Lifetime polishing"
-          aria-label="Add your own promise"
-          className={input}
-        />
-        <button type="button" onClick={addCustom} disabled={!custom.trim() || full} className={`${btn.outline} shrink-0`}>
+      {library.length > 0 && (
+        <>
+          <p className="mt-3 text-xs font-bold text-charcoal">Your promises</p>
+          <ul className="mt-1.5 flex flex-wrap gap-2">
+            {library.map((l) => (
+              <li key={l} className="flex items-center gap-0.5">
+                <Chip on={isOn(l)} disabled={!isOn(l) && full} onClick={() => toggle(l)}>
+                  {l}
+                </Chip>
+                <button type="button" onClick={() => removeFromLibrary(l)} aria-label={`Delete ${l} from your promises`} title="Delete from your promises" className="flex h-7 w-7 items-center justify-center rounded-full text-ink-muted hover:bg-rose-50 hover:text-rose-800">
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <div className="relative mt-3 flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <input
+            value={text}
+            maxLength={40}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add(suggestions[0] && same(suggestions[0], query) ? suggestions[0] : query);
+              }
+            }}
+            placeholder="Add your own, e.g. Lifetime polishing"
+            aria-label="Add your own promise"
+            className={input}
+          />
+          {suggestions.length > 0 && (
+            <ul className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-parchment bg-white shadow-lg">
+              {suggestions.map((s) => (
+                <li key={s}>
+                  <button type="button" onClick={() => add(s)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-ivory-deep">
+                    <Plus className="h-3.5 w-3.5 text-burgundy" aria-hidden="true" /> {s}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button type="button" onClick={() => add()} disabled={!query || full} className={`${btn.outline} shrink-0`}>
           Add
         </button>
       </div>
@@ -101,11 +165,27 @@ function PromisesPicker({ selected, presets }: ProductFormProps["promises"]) {
   );
 }
 
-export function ProductForm({ product, categories, pairing, promises }: ProductFormProps) {
+export function ProductForm({ product, categories, pairing, promises, code }: ProductFormProps) {
   const [images, setImages] = useState(product?.images ?? []);
   const [pairs, setPairs] = useState(pairing?.selected ?? []);
   const [pairQuery, setPairQuery] = useState("");
-  const [prices, setPrices] = useState(product?.prices ?? []);
+  // Options are kept as typed text so nothing is lost while editing; the server checks the numbers.
+  const [prices, setPrices] = useState<PriceRow[]>(() =>
+    product?.prices.length
+      ? product.prices.map((p) => ({
+          key: p.id,
+          id: p.id,
+          // A single option named after the product doesn't need a name of its own.
+          name: product.prices.length === 1 && p.name === product.name ? "" : p.name,
+          amount: p.amount ? String(p.amount) : "",
+          compare: p.compareAtPrice ? String(p.compareAtPrice) : "",
+          track: p.trackInventory,
+          qty: p.availableQuantity === null ? "" : String(p.availableQuantity),
+        }))
+      : [blankPrice()],
+  );
+  const [removedPrices, setRemovedPrices] = useState<string[]>([]);
+  const setPrice = (key: string, patch: Partial<PriceRow>) => setPrices((cur) => cur.map((x) => (x.key === key ? { ...x, ...patch } : x)));
   const siteIds = new Set(categories.map((c) => c.collectionId).filter(Boolean));
   // Collections outside the website's categories are kept as they are.
   const otherCollections = (product?.collectionIds ?? []).filter((id) => !siteIds.has(id));
@@ -162,47 +242,82 @@ export function ProductForm({ product, categories, pairing, promises }: ProductF
           <p className="mt-2 text-xs text-ink-muted">Photos upload straight away and are resized automatically. Square photos look best; the first is the cover.</p>
         </section>
 
-        {product && (
-          <section className="rounded-2xl border border-parchment bg-panel p-5">
-            <h2 className="mb-3 text-base font-bold">Prices & stock</h2>
-            <ul className="space-y-3">
-              {prices.map((p, i) => (
-                <li key={p.id || `new-${i}`} className="grid grid-cols-1 gap-3 rounded-xl bg-ivory-deep p-3 sm:grid-cols-2">
+        <section className="rounded-2xl border border-parchment bg-panel p-5">
+          <h2 className="text-base font-bold">Price & options</h2>
+          <p className="mt-0.5 mb-3 text-xs text-ink-muted">One row = one choice the customer can pick (size, colour, length…). With 2 or more, customers choose on the product page.</p>
+          {removedPrices.map((pid) => (
+            <input key={pid} type="hidden" name="priceDelete" value={pid} />
+          ))}
+          <ul className="space-y-3">
+            {prices.map((p, i) => {
+              const many = prices.length > 1;
+              return (
+                <li key={p.key} className="rounded-xl bg-ivory-deep p-3">
                   <input type="hidden" name="priceId" value={p.id} />
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold">Size / option</label>
-                    <input name="priceName" defaultValue={p.name} className={input} placeholder="e.g. Size 7, or leave as is" />
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-charcoal">{many ? `Option ${i + 1}` : "Price"}</span>
+                    {many && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (p.id) setRemovedPrices((r) => [...r, p.id]);
+                          setPrices(prices.filter((x) => x.key !== p.key));
+                        }}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold">Price ₹</label>
-                    <input name="priceAmount" inputMode="decimal" required defaultValue={p.amount || ""} className={input} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold">Was ₹ (optional)</label>
-                    <input name="priceCompare" inputMode="decimal" defaultValue={p.compareAtPrice ?? ""} className={input} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold">Stock</label>
-                    <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-1.5">
-                      <select name="priceTrack" defaultValue={p.trackInventory ? "yes" : "no"} className={`${input} px-2`}>
-                        <option value="no">Always in stock</option>
-                        <option value="yes">Track quantity</option>
-                      </select>
-                      <input name="priceQty" inputMode="numeric" defaultValue={p.availableQuantity ?? ""} className={`${input} px-2`} aria-label="Quantity in stock" placeholder="Qty" />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className={many ? "" : "hidden"}>
+                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pn-${p.key}`}>
+                        Option name
+                      </label>
+                      <input id={`pn-${p.key}`} name="priceName" value={p.name} onChange={(e) => setPrice(p.key, { name: e.target.value })} required={many} className={input} placeholder="e.g. Size 7, Gold, 16 inch" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pa-${p.key}`}>
+                        Price ₹
+                      </label>
+                      <input id={`pa-${p.key}`} name="priceAmount" inputMode="decimal" required value={p.amount} onChange={(e) => setPrice(p.key, { amount: e.target.value })} className={input} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pc-${p.key}`}>
+                        Was ₹ (optional)
+                      </label>
+                      <input id={`pc-${p.key}`} name="priceCompare" inputMode="decimal" value={p.compare} onChange={(e) => setPrice(p.key, { compare: e.target.value })} className={input} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold" htmlFor={`pt-${p.key}`}>
+                        Stock
+                      </label>
+                      <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-1.5">
+                        <select id={`pt-${p.key}`} name="priceTrack" value={p.track ? "yes" : "no"} onChange={(e) => setPrice(p.key, { track: e.target.value === "yes" })} className={`${input} px-2`}>
+                          <option value="no">Always in stock</option>
+                          <option value="yes">Track quantity</option>
+                        </select>
+                        <input name="priceQty" inputMode="numeric" value={p.qty} onChange={(e) => setPrice(p.key, { qty: e.target.value })} readOnly={!p.track} tabIndex={p.track ? undefined : -1} className={`${input} px-2 ${p.track ? "" : "opacity-40"}`} aria-label="Quantity in stock" placeholder="Qty" />
+                      </div>
                     </div>
                   </div>
                 </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={() => setPrices([...prices, { id: "", name: "", amount: 0, compareAtPrice: null, trackInventory: false, availableQuantity: null }])}
-              className={`${btn.outline} mt-3`}
-            >
-              + Add size / option
-            </button>
-          </section>
-        )}
+              );
+            })}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              // The first option needs a name too once there are two.
+              const first = prices[0];
+              const named = prices.length === 1 && first && (!first.name || first.name === product?.name) ? [{ ...first, name: "" }] : prices;
+              setPrices([...named, blankPrice()]);
+            }}
+            className={`${btn.outline} mt-3`}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" /> Add option
+          </button>
+        </section>
 
         <PromisesPicker {...promises} />
 
@@ -265,6 +380,22 @@ export function ProductForm({ product, categories, pairing, promises }: ProductF
 
       <div className="space-y-4">
         <section className="space-y-4 rounded-2xl border border-parchment bg-panel p-5">
+          <div>
+            <label className={label} htmlFor="productCode">
+              Product code
+            </label>
+            <input
+              id="productCode"
+              name="productCode"
+              defaultValue={code}
+              maxLength={24}
+              autoCapitalize="characters"
+              onInput={(e) => (e.currentTarget.value = e.currentTarget.value.toUpperCase())}
+              className={`${input} font-mono tracking-wider uppercase`}
+              placeholder="e.g. ISH-BR-012"
+            />
+            <p className="mt-1 text-xs text-ink-muted">Shown on the product page and on orders. Customers can search by it.</p>
+          </div>
           <label className="flex items-center gap-3 text-sm font-semibold">
             <input type="checkbox" name="availableInStore" defaultChecked={product?.availableInStore ?? true} className="h-5 w-5 accent-burgundy" />
             Available to buy
@@ -292,22 +423,6 @@ export function ProductForm({ product, categories, pairing, promises }: ProductF
             </ul>
             <p className="mt-2 text-xs text-ink-muted">A product shows on the website when it&apos;s available and in an on-sale category.</p>
           </div>
-          {!product && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className={label} htmlFor="amount">
-                  Price ₹
-                </label>
-                <input id="amount" name="amount" inputMode="decimal" required className={input} />
-              </div>
-              <div>
-                <label className={label} htmlFor="compareAtPrice">
-                  Was ₹
-                </label>
-                <input id="compareAtPrice" name="compareAtPrice" inputMode="decimal" className={input} placeholder="optional" />
-              </div>
-            </div>
-          )}
           <Submit pendingText="Saving…">{product ? "Save changes" : "Create product"}</Submit>
         </section>
       </div>

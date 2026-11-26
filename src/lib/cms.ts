@@ -33,7 +33,11 @@ async function read(fresh: boolean): Promise<CmsContent> {
   if (!fresh && lastSaved && Date.now() - lastSaved.at < LAST_SAVED_TTL) return lastSaved.content;
   try {
     const v = await findValue(fresh);
-    return v?.value ? normaliseCms(JSON.parse(v.value)) : defaultCms;
+    const stored = v?.value ? normaliseCms(JSON.parse(v.value)) : defaultCms;
+    // GoHighLevel can answer with the previous copy for a moment after a save. Never
+    // hand that out (an editor would then save it back and undo the newer change).
+    if (lastSaved && lastSaved.content.savedAt > stored.savedAt) return lastSaved.content;
+    return stored;
   } catch (err) {
     console.warn(`[cms] using built-in content: ${err instanceof Error ? err.message : "error"}`);
     return lastSaved?.content ?? defaultCms;
@@ -47,10 +51,15 @@ export const getCms = cache(() => read(false));
 export const getCmsFresh = () => read(true);
 
 export async function saveCms(content: CmsContent) {
-  const clean = normaliseCms(content);
+  const clean = normaliseCms({ ...content, savedAt: Math.max(Date.now(), (content.savedAt ?? 0) + 1) });
   const value = JSON.stringify(clean);
   const existing = await findValue(true);
   if (existing) await ghlApi("PUT", `/locations/${locationId()}/customValues/${existing.id}`, { body: { name: NAME, value } });
   else await ghlApi("POST", `/locations/${locationId()}/customValues`, { body: { name: NAME, value } });
   lastSaved = { at: Date.now(), content: clean };
+}
+
+/** Read the current content, change it, save it — one read and one write. */
+export async function updateCms(change: (c: CmsContent) => CmsContent) {
+  await saveCms(change(await getCmsFresh()));
 }

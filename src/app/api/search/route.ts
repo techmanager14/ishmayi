@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { allShelves, shelfHref } from "@/data/shelves";
 import { getCollection, type StoreProduct } from "@/lib/catalog";
 import { ALL_HANDLE, getCatalogue } from "@/lib/catalog/config";
+import { getCms } from "@/lib/cms";
 
 const MAX_PRODUCTS = 6;
 const MAX_COLLECTIONS = 3;
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   const empty: SearchResponse = { collections: [], products: [] };
   if (q.length < 2) return NextResponse.json(empty);
 
-  const [all, catalogue] = await Promise.all([getCollection(ALL_HANDLE), getCatalogue()]);
+  const [all, catalogue, cms] = await Promise.all([getCollection(ALL_HANDLE), getCatalogue(), getCms()]);
   const words = q.split(" ");
   const hit = (text: string) => words.every((w) => text.toLowerCase().includes(w));
 
@@ -35,7 +36,11 @@ export async function GET(request: NextRequest) {
       .slice(0, MAX_COLLECTIONS)
       .map(({ href, title }) => ({ href, title })),
     products: (all ?? [])
-      .filter((p) => hit(`${p.title} ${p.subtitle ?? ""}`))
+      // Product code too, so "ISH-BR-012" or "BR012" finds the piece.
+      .filter((p) => {
+        const code = cms.productCodes[p.handle] ?? "";
+        return hit(`${p.title} ${p.subtitle ?? ""} ${code} ${code.replace(/[\s\-_/.]/g, "")}`);
+      })
       .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
       .map((p) => ({ handle: p.handle, title: p.title, subtitle: p.subtitle, price: p.price, image: p.image?.src ?? null })),

@@ -133,8 +133,13 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
  */
 export const CONTENT_REV = 2;
 
+/** Built-in product promises (labels in lib/promises). Anything else in a product's list is the admin's own text. */
+export const PROMISE_PRESETS = ["delivery", "secure", "damage", "shipping", "handcrafted", "silver", "natural", "skin", "gift"] as const;
+
 export interface CmsContent {
   contentRev: number;
+  /** When this content was last saved (ms). Used to never write back an older copy. */
+  savedAt: number;
   announcement: { enabled: boolean; text: string; link: string };
   banners: CmsBanner[];
   videos: CmsVideo[];
@@ -148,6 +153,10 @@ export interface CmsContent {
   pairings: Record<string, string[]>;
   /** Promises shown on a product page: product id → preset ids (lib/promises) or custom text. Missing = the defaults. */
   promises: Record<string, string[]>;
+  /** The admin's own promises, offered on every product (Admin → product → Promises). */
+  promiseLibrary: string[];
+  /** Product code (SKU) per product id, e.g. "ISH-BR-012". */
+  productCodes: Record<string, string>;
   /** Home "Shop by Occasion": heading and cards. */
   occasions: { title: string; items: CmsOccasion[] };
   pages: CmsPages;
@@ -205,6 +214,7 @@ const banner = (b: Partial<CmsBanner> & Pick<CmsBanner, "id">): CmsBanner => ({
 
 export const defaultCms: CmsContent = {
   contentRev: CONTENT_REV,
+  savedAt: 0,
   announcement: { enabled: false, text: "", link: "" },
   banners: [
     banner({ id: "catalogue", tone: "light", image: "/banners/catalogue.jpg", ctaHref: "/shop", body: "Explore the complete Ishmayi catalogue: bracelets, pendants, necklaces, earrings, rings and hasli. Many pieces are 18K gold plated, also available in silver and rhodium plated finishes." }),
@@ -224,6 +234,8 @@ export const defaultCms: CmsContent = {
   coupons: [],
   pairings: {},
   promises: {},
+  promiseLibrary: [],
+  productCodes: {},
   occasions: {
     title: "Shop by Occasion",
     items: builtInOccasions.map((o) => ({ id: o.slug, title: o.title, blurb: o.blurb, image: o.image ?? "", enabled: true, products: [], autoMatch: true })),
@@ -411,8 +423,11 @@ export function normaliseCms(raw: unknown): CmsContent {
   const c = isObj(r.contact) ? r.contact : {};
   const a = isObj(r.announcement) ? r.announcement : {};
 
+  const promises = normalisePromises(r.promises);
+
   return {
     contentRev: CONTENT_REV,
+    savedAt: Math.round(num(r.savedAt, 0, 0, 1e14)),
     announcement: { enabled: a.enabled === true, text: str(a.text, "", 200), link: url(a.link) },
     banners,
     videos,
@@ -443,7 +458,10 @@ export function normaliseCms(raw: unknown): CmsContent {
         })).filter((c) => c.code && c.value > 0 && (c.type === "flat" || c.value <= 100))
       : d.coupons,
     pairings: normalisePairings(r.pairings),
-    promises: normalisePromises(r.promises),
+    promises,
+    // Never saved before: start from the custom promises already used on products.
+    promiseLibrary: cleanPromiseList(Array.isArray(r.promiseLibrary) ? r.promiseLibrary : Object.values(promises).flat().filter((x) => !(PROMISE_PRESETS as readonly string[]).includes(x)), 40),
+    productCodes: normaliseCodes(r.productCodes),
     occasions: normaliseOccasions(r.occasions, d.occasions),
     store: {
       ordersOpen: bool(st.ordersOpen, d.store.ordersOpen),
@@ -564,13 +582,40 @@ function normaliseOccasions(v: unknown, d: CmsContent["occasions"]): CmsContent[
   return { title: str(v.title, d.title, 60).trim() || d.title, items };
 }
 
+/** Short promise texts: trimmed, max 40 characters, no duplicates (ignoring case). */
+export function cleanPromiseList(list: unknown[], max: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of list) {
+    if (typeof x !== "string") continue;
+    const t = x.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out.slice(0, max);
+}
+
 /** Up to 6 short promises per product. An empty list is kept: it means "show none". */
 function normalisePromises(v: unknown): Record<string, string[]> {
   if (!v || typeof v !== "object") return {};
   const out: Record<string, string[]> = {};
   for (const [id, list] of Object.entries(v as Record<string, unknown>).slice(0, 2000)) {
     if (!PRODUCT_ID.test(id) || !Array.isArray(list)) continue;
-    out[id] = [...new Set(list.filter((x): x is string => typeof x === "string").map((x) => x.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean))].slice(0, 6);
+    out[id] = cleanPromiseList(list, 6);
+  }
+  return out;
+}
+
+/** Product codes: letters, numbers, - _ / . and spaces, up to 24 characters. */
+export const cleanProductCode = (v: unknown) => (typeof v === "string" ? v.toUpperCase().replace(/[^A-Z0-9\-_/. ]/g, "").replace(/\s+/g, " ").trim().slice(0, 24) : "");
+
+function normaliseCodes(v: unknown): Record<string, string> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [id, code] of Object.entries(v as Record<string, unknown>).slice(0, 5000)) {
+    const c = cleanProductCode(code);
+    if (PRODUCT_ID.test(id) && c) out[id] = c;
   }
   return out;
 }

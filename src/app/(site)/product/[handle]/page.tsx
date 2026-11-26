@@ -60,7 +60,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="container-page hidden pt-7 md:block">
         <Breadcrumbs items={[{ href: "/shop", label: "Shop" }, { label: product.title }]} />
       </div>
-      <ProductView product={product} matches={matches} promises={productPromises(cms, product.handle)} offers={publicCoupons(cms).map((c) => ({ code: c.code, value: couponValue(c), conditions: couponConditions(c) }))} />
+      <ProductView product={product} matches={matches} promises={productPromises(cms, product.handle)} code={cms.productCodes[product.handle]} offers={publicCoupons(cms).map((c) => ({ code: c.code, value: couponValue(c), conditions: couponConditions(c) }))} />
       {related.length > 0 && (
         <section className="container-page border-t border-parchment py-12 md:py-20" aria-labelledby="related-title">
           <SectionHeading id="related-title" align="left" title="You may also like" />

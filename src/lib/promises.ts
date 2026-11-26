@@ -1,8 +1,8 @@
 // Product page promises ("7–15 day delivery", "Secure payment", …). Each product stores a list
 // of preset ids and/or its own custom text in the website content (cms.promises).
-import { shippingLabel, type CmsContent } from "./cms-types";
+import { PROMISE_PRESETS, shippingLabel, type CmsContent } from "./cms-types";
 
-export const PROMISE_PRESETS = ["delivery", "secure", "damage", "shipping", "handcrafted", "silver", "natural", "skin", "gift"] as const;
+export { PROMISE_PRESETS };
 export type PromisePreset = (typeof PROMISE_PRESETS)[number];
 /** What a product shows until the admin picks its own. */
 export const DEFAULT_PROMISES: string[] = ["delivery", "secure", "damage"];

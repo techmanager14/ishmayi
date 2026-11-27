@@ -1,10 +1,17 @@
 "use client";
 
-import { Check, ImagePlus, Layers, Plus, Tag, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { MAX_OPTIONS, MAX_VALUES, MAX_VARIANT_PHOTOS, combinations, type Pricing, type PricingOption } from "@/lib/admin/pricing";
+import { Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { MAX_VARIANT_PHOTOS, type Pricing, type PricingOption } from "@/lib/admin/pricing";
 import { thumbUrl } from "@/lib/images";
+import { PhotoAdder } from "./media";
 import { btn, input } from "./ui";
+
+/**
+ * Price & variants, kept simple for the shop owner:
+ * one main price, then (optionally) a list of variants that differ by Colour, Size and/or Length.
+ * Each variant: same price as the main one or its own, main photos or its own, in stock or not.
+ */
 
 export interface VariantsInitial {
   options: PricingOption[];
@@ -13,355 +20,276 @@ export interface VariantsInitial {
   images: Record<string, string[]>;
 }
 
-interface Row {
+const TYPES = ["Colour", "Size", "Length"] as const;
+type VariantType = (typeof TYPES)[number];
+const PLACEHOLDER: Record<VariantType, string> = { Colour: "e.g. Gold", Size: "e.g. 7 or M", Length: "e.g. 16 inch" };
+
+interface Variant {
+  uid: string;
   priceId: string;
-  on: boolean;
-  amount: string;
-  compare: string;
+  values: Record<VariantType, string>;
+  samePrice: boolean;
+  price: string;
+  original: string;
+  ownPhotos: boolean;
+  photos: string[];
+  inStock: boolean;
+  /** Kept from GoHighLevel so a counted stock isn't lost. */
   track: boolean;
   qty: string;
-  images: string[];
 }
 
-const OPTION_SUGGESTIONS = ["Size", "Colour", "Length", "Metal", "Stone", "Style"];
-const VALUE_HINTS: Record<string, string> = { size: "e.g. 6, 7, 8 or S, M, L", colour: "e.g. Gold, Silver, Rose gold", color: "e.g. Gold, Silver, Rose gold", length: "e.g. 16 inch, 18 inch", metal: "e.g. 925 Silver, Brass", stone: "e.g. Amethyst, Rose Quartz" };
-const keyOf = (values: string[]) => values.join(" / ");
-const blankRow = (from?: Partial<Row>): Row => ({ priceId: "", on: true, amount: from?.amount ?? "", compare: from?.compare ?? "", track: from?.track ?? false, qty: "", images: [] });
-const priceRow = (p: VariantsInitial["prices"][number], images: string[] = []): Row => ({
-  priceId: p.id,
-  on: true,
-  amount: p.amount ? String(p.amount) : "",
-  compare: p.compareAtPrice ? String(p.compareAtPrice) : "",
-  track: p.trackInventory,
-  qty: p.availableQuantity === null ? "" : String(p.availableQuantity),
-  images,
-});
+let seq = 0;
+const uid = () => `v${++seq}`;
+const emptyValues = (): Record<VariantType, string> => ({ Colour: "", Size: "", Length: "" });
+const newVariant = (): Variant => ({ uid: uid(), priceId: "", values: emptyValues(), samePrice: true, price: "", original: "", ownPhotos: false, photos: [], inStock: true, track: false, qty: "" });
+const money = (n: number | null) => (n ? String(n) : "");
+
+/** Old option names (e.g. "Color", "Option") mapped onto Colour / Size / Length. */
+function typeFor(name: string, used: VariantType[]): VariantType | null {
+  const n = name.trim().toLowerCase();
+  const direct: VariantType | null = /colou?r/.test(n) ? "Colour" : /size/.test(n) ? "Size" : /length/.test(n) ? "Length" : null;
+  if (direct && !used.includes(direct)) return direct;
+  return TYPES.find((t) => !used.includes(t)) ?? null;
+}
 
 function initialState(init: VariantsInitial) {
   const prices = init.prices;
-  // Product with options (Size, Colour…).
-  if (init.options.length && prices.every((p) => p.optionValues.length === init.options.length && p.optionValues.every(Boolean))) {
-    const rows: Record<string, Row> = {};
-    for (const p of prices) rows[keyOf(p.optionValues)] = priceRow(p, init.images[keyOf(p.optionValues)] ?? []);
-    for (const combo of combinations(init.options)) rows[keyOf(combo)] ??= { ...blankRow(), on: false };
-    return { mode: "options" as const, options: init.options, rows, simple: blankRow() };
-  }
-  // Older products with several plain prices: shown as one option, so nothing is lost.
-  if (prices.length > 1) {
-    const values = [...new Set(prices.map((p) => p.name.trim() || "Option"))];
-    const rows: Record<string, Row> = {};
-    for (const p of prices) rows[p.name.trim() || "Option"] ??= priceRow(p);
-    return { mode: "options" as const, options: [{ name: "Option", values }], rows, simple: blankRow() };
-  }
-  return { mode: "simple" as const, options: [] as PricingOption[], rows: {} as Record<string, Row>, simple: prices[0] ? priceRow(prices[0]) : blankRow() };
+  const amounts = prices.map((p) => p.amount).filter(Boolean);
+  // Main price: the most common variant price (or the only price).
+  const common = amounts.sort((a, b) => amounts.filter((x) => x === b).length - amounts.filter((x) => x === a).length)[0] ?? 0;
+  const mainSource = prices.find((p) => p.amount === common) ?? prices[0];
+  const main = { priceId: prices.length === 1 && !init.options.length ? (prices[0]?.id ?? "") : "", price: money(mainSource?.amount ?? null), original: money(mainSource?.compareAtPrice ?? null), track: prices.length === 1 ? !!prices[0]?.trackInventory : false, qty: prices.length === 1 ? String(prices[0]?.availableQuantity ?? "") : "" };
+
+  const hasOptions = init.options.length > 0 && prices.every((p) => p.optionValues.length === init.options.length && p.optionValues.every(Boolean));
+  if (!hasOptions && prices.length <= 1) return { on: false, types: ["Colour"] as VariantType[], main, variants: [newVariant()] };
+
+  // Map saved options (or older plain prices) onto Colour / Size / Length.
+  const types: VariantType[] = [];
+  const optionTypes = hasOptions ? init.options.map((o) => { const t = typeFor(o.name, types); if (t) types.push(t); return t; }) : [];
+  if (!hasOptions) types.push("Size");
+  const variants = prices.map((p) => {
+    const values = emptyValues();
+    if (hasOptions) p.optionValues.forEach((v, i) => { const t = optionTypes[i]; if (t) values[t] = v; });
+    else values.Size = p.name.trim();
+    const key = hasOptions ? p.optionValues.join(" / ") : "";
+    const photos = (key && init.images[key]) || [];
+    const same = p.amount === common && (p.compareAtPrice ?? null) === (mainSource?.compareAtPrice ?? null);
+    return {
+      uid: uid(),
+      priceId: p.id,
+      values,
+      samePrice: same,
+      price: money(p.amount),
+      original: money(p.compareAtPrice),
+      ownPhotos: photos.length > 0,
+      photos,
+      inStock: !(p.trackInventory && (p.availableQuantity ?? 0) <= 0),
+      track: p.trackInventory,
+      qty: p.availableQuantity === null ? "" : String(p.availableQuantity),
+    };
+  });
+  return { on: true, types: types.length ? types : (["Colour"] as VariantType[]), main, variants };
 }
 
-function Money({ value, onChange, label, placeholder }: { value: string; onChange: (v: string) => void; label: string; placeholder?: string }) {
+function Money({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block text-[0.7rem] font-semibold text-ink-muted">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-charcoal">{label}</span>
       <span className="relative block">
-        <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-ink-muted">₹</span>
-        <input value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" placeholder={placeholder} className={`${input} pl-6`} />
+        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-ink-muted">₹</span>
+        <input value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" className={`${input} pl-7`} />
       </span>
+      {hint && <span className="mt-1 block text-[0.7rem] text-ink-muted">{hint}</span>}
     </label>
   );
 }
 
-function Stock({ track, qty, onChange }: { track: boolean; qty: string; onChange: (p: { track?: boolean; qty?: string }) => void }) {
+/** Two big, clear choices (like radio buttons). */
+function Choice({ value, onChange, yes, no, name }: { value: boolean; onChange: (v: boolean) => void; yes: string; no: string; name: string }) {
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[0.7rem] font-semibold text-ink-muted">Stock</span>
-      <span className="grid grid-cols-[minmax(0,1fr)_4rem] gap-1.5">
-        <select value={track ? "yes" : "no"} onChange={(e) => onChange({ track: e.target.value === "yes" })} className={`${input} px-2`}>
-          <option value="no">Always in stock</option>
-          <option value="yes">Count stock</option>
-        </select>
-        <input value={qty} onChange={(e) => onChange({ qty: e.target.value })} inputMode="numeric" readOnly={!track} tabIndex={track ? undefined : -1} aria-label="Quantity in stock" placeholder="Qty" className={`${input} px-2 ${track ? "" : "opacity-40"}`} />
-      </span>
-    </label>
-  );
-}
-
-/** One option (e.g. Size) with its values as chips. */
-function OptionCard({ option, index, onChange, onRemove, taken }: { option: PricingOption; index: number; onChange: (o: PricingOption) => void; onRemove: () => void; taken: string[] }) {
-  const [draft, setDraft] = useState("");
-  const addValues = (raw: string) => {
-    // Several at once: "6, 7, 8".
-    const next = [...option.values];
-    for (const v of raw.split(",").map((x) => x.replace(/\s+/g, " ").trim().slice(0, 40))) if (v && !next.some((x) => x.toLowerCase() === v.toLowerCase())) next.push(v);
-    onChange({ ...option, values: next.slice(0, MAX_VALUES) });
-    setDraft("");
-  };
-  const hint = VALUE_HINTS[option.name.trim().toLowerCase()] ?? "Type a value and press Enter";
-  return (
-    <div className="rounded-xl border border-parchment bg-white p-3">
-      <div className="flex items-start gap-2">
-        <span className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-burgundy text-xs font-bold text-white">{index + 1}</span>
-        <div className="min-w-0 flex-1">
-          <input value={option.name} onChange={(e) => onChange({ ...option, name: e.target.value.slice(0, 30) })} placeholder="Option name, e.g. Size" aria-label={`Option ${index + 1} name`} className={`${input} font-semibold`} />
-          {!option.name.trim() && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {OPTION_SUGGESTIONS.filter((s) => !taken.some((t) => t.toLowerCase() === s.toLowerCase())).map((s) => (
-                <button key={s} type="button" onClick={() => onChange({ ...option, name: s })} className="rounded-full border border-parchment px-2.5 py-1 text-xs font-semibold hover:border-burgundy">
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button type="button" onClick={onRemove} aria-label={`Remove option ${option.name || index + 1}`} className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-rose-50 hover:text-rose-800">
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
+    <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={name}>
+      {[
+        [true, yes],
+        [false, no],
+      ].map(([v, text]) => (
+        <button
+          key={String(v)}
+          type="button"
+          role="radio"
+          aria-checked={value === v}
+          onClick={() => onChange(v as boolean)}
+          className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-left text-sm font-semibold transition ${value === v ? "border-burgundy bg-blush text-burgundy" : "border-parchment bg-white text-charcoal hover:border-charcoal/40"}`}
+        >
+          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${value === v ? "border-burgundy" : "border-[#c9c4bd]"}`}>{value === v && <span className="h-2 w-2 rounded-full bg-burgundy" />}</span>
+          {text as string}
         </button>
-      </div>
-      <div className="mt-2.5 ml-8 flex flex-wrap items-center gap-1.5">
-        {option.values.map((v) => (
-          <span key={v} className="flex items-center gap-1 rounded-full bg-blush py-1 pr-1 pl-2.5 text-xs font-semibold text-charcoal">
-            {v}
-            <button type="button" onClick={() => onChange({ ...option, values: option.values.filter((x) => x !== v) })} aria-label={`Remove ${v}`} className="flex h-5 w-5 items-center justify-center rounded-full text-burgundy hover:bg-white">
-              <X className="h-3 w-3" aria-hidden="true" />
-            </button>
-          </span>
-        ))}
-        <input
-          value={draft}
-          onChange={(e) => (e.target.value.endsWith(",") ? addValues(e.target.value) : setDraft(e.target.value))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addValues(draft);
-            }
-            if (e.key === "Backspace" && !draft && option.values.length) onChange({ ...option, values: option.values.slice(0, -1) });
-          }}
-          onBlur={() => draft.trim() && addValues(draft)}
-          placeholder={option.values.length ? "Add value" : hint}
-          aria-label={`Add a value to ${option.name || "this option"}`}
-          className="min-w-[9rem] flex-1 rounded-lg border border-dashed border-parchment bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-burgundy"
-        />
-      </div>
+      ))}
     </div>
   );
 }
 
-/** Photo chooser for one variant: tick the product photos that show it. */
-function PhotoPicker({ photos, value, onChange, onApply, applyLabels }: { photos: string[]; value: string[]; onChange: (v: string[]) => void; onApply: (i: number) => void; applyLabels: string[] }) {
-  if (!photos.length) return <p className="text-xs text-ink-muted">Add product photos above first, then pick which ones show this variant.</p>;
-  return (
-    <div>
-      <ul className="grid grid-cols-5 gap-1.5 sm:grid-cols-8">
-        {photos.map((src) => {
-          const on = value.includes(src);
-          return (
-            <li key={src}>
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => onChange(on ? value.filter((x) => x !== src) : [...value, src].slice(0, MAX_VARIANT_PHOTOS))}
-                className={`relative block aspect-square w-full overflow-hidden rounded-lg border-2 ${on ? "border-burgundy" : "border-transparent opacity-70 hover:opacity-100"}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={thumbUrl(src, 120)} alt="" className="h-full w-full object-cover" />
-                {on && (
-                  <span className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-burgundy text-white">
-                    <Check className="h-3 w-3" aria-hidden="true" />
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {applyLabels.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {applyLabels.map((l, i) => (
-            <button key={l} type="button" onClick={() => onApply(i)} className="rounded-full border border-parchment px-2.5 py-1 text-xs font-semibold hover:border-burgundy">
-              Use these for every “{l}”
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+export function VariantsEditor({ initial }: { initial: VariantsInitial; photos?: string[] }) {
+  const [start] = useState(() => initialState(initial));
+  const [main, setMain] = useState(start.main);
+  const [on, setOn] = useState(start.on);
+  const [types, setTypes] = useState<VariantType[]>(start.types);
+  const [variants, setVariants] = useState<Variant[]>(start.variants);
+  const set = (id: string, patch: Partial<Variant>) => setVariants((cur) => cur.map((v) => (v.uid === id ? { ...v, ...patch } : v)));
 
-export function VariantsEditor({ initial, photos }: { initial: VariantsInitial; photos: string[] }) {
-  const start = useMemo(() => initialState(initial), [initial]);
-  const [mode, setMode] = useState<"simple" | "options">(start.mode);
-  const [simple, setSimple] = useState<Row>(start.simple);
-  const [options, setOptions] = useState<PricingOption[]>(start.options.length ? start.options : [{ name: "", values: [] }]);
-  const [rows, setRows] = useState<Record<string, Row>>(start.rows);
-  const [openPhotos, setOpenPhotos] = useState<string | null>(null);
-  const [bulk, setBulk] = useState({ amount: "", compare: "" });
+  const label = (v: Variant) => types.map((t) => v.values[t].trim()).filter(Boolean).join(" · ") || "New variant";
+  const keys = variants.map((v) => types.map((t) => v.values[t].trim().toLowerCase()).join("|"));
+  const duplicateOf = (i: number) => (keys[i] && keys.indexOf(keys[i]) !== i ? keys.indexOf(keys[i]) + 1 : 0);
 
-  const ready = options.filter((o) => o.name.trim() && o.values.length);
-  const combos = combinations(ready);
-  // New combinations start switched on, with the product's usual price.
-  const fallback = Object.values(rows).find((r) => r.on && r.amount) ?? simple;
-  const rowFor = (combo: string[]) => rows[keyOf(combo)] ?? blankRow({ amount: fallback.amount, compare: fallback.compare, track: fallback.track });
-  const setRow = (key: string, patch: Partial<Row>) => setRows((cur) => ({ ...cur, [key]: { ...(cur[key] ?? rowFor(key.split(" / "))), ...patch } }));
-  const onCount = combos.filter((c) => rowFor(c).on).length;
-
-  const pricing: Pricing =
-    mode === "simple"
-      ? { options: [], rows: [{ ...simple, values: [], priceId: simple.priceId || Object.values(rows).find((r) => r.priceId)?.priceId || "" }] }
-      : { options: ready, rows: combos.map((c) => ({ values: c, ...rowFor(c) })).filter((r) => r.on) };
-
-  const switchTo = (m: "simple" | "options") => {
-    if (m === mode) return;
-    if (m === "simple" && onCount > 1 && !window.confirm("Use one price for this product? Its variants will be removed when you save.")) return;
-    if (m === "simple") {
-      const first = combos.map((c) => rowFor(c)).find((r) => r.on);
-      if (first && !simple.amount) setSimple({ ...simple, amount: first.amount, compare: first.compare, priceId: first.priceId });
-    }
-    setMode(m);
-  };
+  // What the server saves (see lib/admin/pricing).
+  const pricing: Pricing = !on
+    ? { options: [], rows: [{ priceId: main.priceId || variants.find((v) => v.priceId)?.priceId || "", values: [], amount: main.price, compare: main.original, track: main.track, qty: main.qty, images: [] }] }
+    : {
+        options: types.map((t) => ({ name: t, values: [...new Set(variants.map((v) => v.values[t].trim()).filter(Boolean))] })),
+        rows: variants.map((v) => ({
+          priceId: v.priceId,
+          values: types.map((t) => v.values[t].trim()),
+          amount: v.samePrice ? main.price : v.price,
+          compare: v.samePrice ? main.original : v.original,
+          track: v.inStock ? v.track : true,
+          qty: v.inStock ? v.qty : "0",
+          images: v.ownPhotos ? v.photos : [],
+        })),
+      };
+  const missing = on ? variants.findIndex((v) => types.some((t) => !v.values[t].trim())) : -1;
 
   return (
     <section className="rounded-2xl border border-parchment bg-panel p-5">
       <input type="hidden" name="pricing" value={JSON.stringify(pricing)} />
-      <h2 className="text-base font-bold">Price & variants</h2>
-      <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-ivory-deep p-1" role="radiogroup" aria-label="How is this product sold?">
-        {(
-          [
-            ["simple", "One price", "Same price for everyone", Tag],
-            ["options", "Variants", "Size, colour, length…", Layers],
-          ] as const
-        ).map(([m, title, sub, Icon]) => (
-          <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => switchTo(m)} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition ${mode === m ? "bg-white shadow-sm ring-1 ring-burgundy/30" : "hover:bg-white/60"}`}>
-            <Icon className={`h-5 w-5 shrink-0 ${mode === m ? "text-burgundy" : "text-ink-muted"}`} aria-hidden="true" />
-            <span className="min-w-0">
-              <span className="block text-sm font-bold text-charcoal">{title}</span>
-              <span className="block truncate text-[0.7rem] text-ink-muted">{sub}</span>
-            </span>
-          </button>
-        ))}
+      <h2 className="text-base font-bold">Price</h2>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Money label="Selling price" value={main.price} onChange={(price) => setMain({ ...main, price })} />
+        <Money label="Original price (optional)" value={main.original} onChange={(original) => setMain({ ...main, original })} hint="Shown crossed out, e.g. ₹2,000 → ₹1,500" />
       </div>
+      {!on && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-charcoal">
+          <input
+            type="checkbox"
+            checked={!(main.track && !Number(main.qty))}
+            onChange={(e) => setMain({ ...main, ...(e.target.checked ? { track: false, qty: "" } : { track: true, qty: "0" }) })}
+            className="h-5 w-5 accent-burgundy"
+          />
+          In stock
+        </label>
+      )}
 
-      {mode === "simple" ? (
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Money label="Price" value={simple.amount} onChange={(amount) => setSimple({ ...simple, amount })} />
-          <Money label="Was (optional)" value={simple.compare} onChange={(compare) => setSimple({ ...simple, compare })} placeholder="Shows a discount" />
-          <Stock track={simple.track} qty={simple.qty} onChange={(p) => setSimple({ ...simple, ...p })} />
-        </div>
-      ) : (
+      {/* Variants on/off */}
+      <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl bg-ivory-deep p-3">
+        <span className="relative inline-flex shrink-0">
+          <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="peer sr-only" />
+          <span className="h-6 w-11 rounded-full bg-parchment transition peer-checked:bg-[#5e0f2c]" />
+          <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+        </span>
+        <span>
+          <span className="block text-sm font-bold text-charcoal">This product has variants</span>
+          <span className="block text-xs text-ink-muted">Different colours, sizes or lengths the customer can choose.</span>
+        </span>
+      </label>
+
+      {on && (
         <>
-          {/* Step 1: options */}
-          <p className="mt-5 text-sm font-bold text-charcoal">1 · What can customers choose?</p>
-          <p className="text-xs text-ink-muted">Add an option, then its values. Type several at once with commas: 6, 7, 8.</p>
-          <div className="mt-2.5 space-y-2.5">
-            {options.map((o, i) => (
-              <OptionCard
-                key={i}
-                option={o}
-                index={i}
-                taken={options.map((x) => x.name)}
-                onChange={(next) => setOptions(options.map((x, j) => (j === i ? next : x)))}
-                onRemove={() => setOptions(options.length > 1 ? options.filter((_, j) => j !== i) : [{ name: "", values: [] }])}
-              />
-            ))}
+          <p className="mt-4 text-sm font-bold text-charcoal">Variants differ by</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {TYPES.map((t) => {
+              const picked = types.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={picked}
+                  onClick={() => setTypes(picked ? (types.length > 1 ? types.filter((x) => x !== t) : types) : TYPES.filter((x) => x === t || types.includes(x)))}
+                  className={`rounded-full border-2 px-4 py-1.5 text-sm font-semibold transition ${picked ? "border-burgundy bg-burgundy text-white" : "border-parchment bg-white text-charcoal hover:border-burgundy"}`}
+                >
+                  {picked ? "✓ " : "+ "}
+                  {t}
+                </button>
+              );
+            })}
           </div>
-          {options.length < MAX_OPTIONS && (
-            <button type="button" onClick={() => setOptions([...options, { name: "", values: [] }])} className={`${btn.outline} mt-2.5`}>
-              <Plus className="h-4 w-4" aria-hidden="true" /> Add another option
-            </button>
-          )}
 
-          {/* Step 2: variants */}
-          <div className="mt-6 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold text-charcoal">2 · Variants {combos.length > 0 && <span className="font-semibold text-ink-muted">({onCount} on sale)</span>}</p>
-              <p className="text-xs text-ink-muted">Each combination has its own price, stock and photos. Switch off any you don&apos;t sell.</p>
-            </div>
-          </div>
-          {combos.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed border-parchment bg-ivory-deep/60 px-4 py-5 text-center text-sm text-ink-muted">Your variants appear here once an option has a name and a value.</p>
-          ) : (
-            <>
-              {combos.length > 1 && (
-                <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-ivory-deep p-2.5">
-                  <div className="w-28">
-                    <Money label="Price for all" value={bulk.amount} onChange={(amount) => setBulk({ ...bulk, amount })} />
+          <ul className="mt-4 space-y-3">
+            {variants.map((v, i) => {
+              const dup = duplicateOf(i);
+              return (
+                <li key={v.uid} className="rounded-xl border border-parchment bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-charcoal">
+                      <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-burgundy text-xs text-white">{i + 1}</span>
+                      {label(v)}
+                    </p>
+                    {variants.length > 1 && (
+                      <button type="button" onClick={() => setVariants(variants.filter((x) => x.uid !== v.uid))} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-50">
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
+                      </button>
+                    )}
                   </div>
-                  <div className="w-28">
-                    <Money label="Was for all" value={bulk.compare} onChange={(compare) => setBulk({ ...bulk, compare })} />
+
+                  {/* Colour / Size / Length */}
+                  <div className={`mt-3 grid gap-3 ${types.length === 1 ? "grid-cols-1" : types.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>
+                    {types.map((t) => (
+                      <label key={t} className="block min-w-0">
+                        <span className="mb-1 block text-xs font-semibold text-charcoal">{t}</span>
+                        <input value={v.values[t]} onChange={(e) => set(v.uid, { values: { ...v.values, [t]: e.target.value.slice(0, 40) } })} placeholder={PLACEHOLDER[t]} className={input} />
+                      </label>
+                    ))}
                   </div>
-                  <button
-                    type="button"
-                    disabled={!bulk.amount && !bulk.compare}
-                    onClick={() => {
-                      const next = { ...rows };
-                      for (const c of combos) next[keyOf(c)] = { ...rowFor(c), ...(bulk.amount ? { amount: bulk.amount } : {}), ...(bulk.compare ? { compare: bulk.compare } : {}) };
-                      setRows(next);
-                      setBulk({ amount: "", compare: "" });
-                    }}
-                    className={btn.outline}
-                  >
-                    Apply to all
-                  </button>
-                </div>
-              )}
-              <ul className="mt-2.5 space-y-2">
-                {combos.map((combo) => {
-                  const key = keyOf(combo);
-                  const r = rowFor(combo);
-                  const open = openPhotos === key;
-                  return (
-                    <li key={key} className={`rounded-xl border p-2.5 transition ${r.on ? "border-parchment bg-white" : "border-dashed border-parchment bg-ivory-deep/50"}`}>
-                      <div className="flex items-center gap-2.5">
-                        <label className="relative inline-flex shrink-0 cursor-pointer" title={r.on ? "On sale" : "Not sold"}>
-                          <input type="checkbox" checked={r.on} onChange={(e) => setRow(key, { on: e.target.checked })} className="peer sr-only" aria-label={`Sell ${key}`} />
-                          <span className="h-5 w-9 rounded-full bg-parchment transition peer-checked:bg-[#5e0f2c]" />
-                          <span className="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-4" />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setOpenPhotos(open ? null : key)}
-                          aria-label={`Photos for ${key}`}
-                          aria-expanded={open}
-                          className={`relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border ${open ? "border-burgundy" : "border-parchment"} bg-ivory-deep`}
-                        >
-                          {r.images[0] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumbUrl(r.images[0], 120)} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <ImagePlus className="h-4 w-4 text-ink-muted" aria-hidden="true" />
-                          )}
-                          {r.images.length > 1 && <span className="absolute right-0 bottom-0 rounded-tl bg-burgundy px-1 text-[0.6rem] font-bold text-white">{r.images.length}</span>}
-                        </button>
-                        <span className={`min-w-0 flex-1 truncate text-sm font-bold ${r.on ? "text-charcoal" : "text-ink-muted line-through"}`}>{combo.join(" · ")}</span>
-                      </div>
-                      {r.on && (
-                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1.4fr] sm:pl-[5.4rem]">
-                          <Money label="Price" value={r.amount} onChange={(amount) => setRow(key, { amount })} />
-                          <Money label="Was" value={r.compare} onChange={(compare) => setRow(key, { compare })} placeholder="optional" />
-                          <div className="col-span-2 sm:col-span-1">
-                            <Stock track={r.track} qty={r.qty} onChange={(p) => setRow(key, p)} />
-                          </div>
-                        </div>
+                  {dup > 0 && <p className="mt-1.5 text-xs font-semibold text-amber-800">Same as variant {dup}. Change one of them.</p>}
+
+                  {/* Price */}
+                  <p className="mt-4 mb-1.5 text-xs font-semibold text-charcoal">Price</p>
+                  <Choice name={`Price of variant ${i + 1}`} value={v.samePrice} onChange={(samePrice) => set(v.uid, { samePrice, price: v.price || main.price })} yes={`Same as main${main.price ? ` (₹${main.price})` : ""}`} no="Different price" />
+                  {!v.samePrice && (
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      <Money label="Selling price" value={v.price} onChange={(price) => set(v.uid, { price })} />
+                      <Money label="Original price (optional)" value={v.original} onChange={(original) => set(v.uid, { original })} />
+                    </div>
+                  )}
+
+                  {/* Photos */}
+                  <p className="mt-4 mb-1.5 text-xs font-semibold text-charcoal">Photos</p>
+                  <Choice name={`Photos of variant ${i + 1}`} value={!v.ownPhotos} onChange={(useMain) => set(v.uid, { ownPhotos: !useMain })} yes="Use main photos" no="Has its own photos" />
+                  {v.ownPhotos && (
+                    <div className="mt-2 rounded-lg bg-ivory-deep p-3">
+                      {v.photos.length > 0 && (
+                        <ul className="mb-3 flex flex-wrap gap-2">
+                          {v.photos.map((src) => (
+                            <li key={src} className="relative">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={thumbUrl(src, 160)} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                              <button type="button" onClick={() => set(v.uid, { photos: v.photos.filter((x) => x !== src) })} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-burgundy text-white shadow">
+                                <X className="h-3 w-3" aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                      {open && (
-                        <div className="mt-2.5 border-t border-parchment pt-2.5 sm:pl-[5.4rem]">
-                          <p className="mb-1.5 text-xs font-semibold text-charcoal">Photos that show {combo.join(" · ")}</p>
-                          <PhotoPicker
-                            photos={photos}
-                            value={r.images.filter((x) => photos.includes(x))}
-                            onChange={(images) => setRow(key, { images })}
-                            applyLabels={ready.length > 1 ? combo : []}
-                            onApply={(i) => {
-                              // Same photos for every variant with this value, e.g. all "Gold" sizes.
-                              const next = { ...rows };
-                              for (const c of combos) if (c[i] === combo[i]) next[keyOf(c)] = { ...rowFor(c), images: r.images };
-                              setRows(next);
-                            }}
-                          />
-                        </div>
+                      {v.photos.length < MAX_VARIANT_PHOTOS ? (
+                        <PhotoAdder onAdd={(urls) => set(v.uid, { photos: [...v.photos, ...urls.filter((u) => !v.photos.includes(u))].slice(0, MAX_VARIANT_PHOTOS) })} />
+                      ) : (
+                        <p className="text-xs text-ink-muted">Up to {MAX_VARIANT_PHOTOS} photos per variant.</p>
                       )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
+                    </div>
+                  )}
+
+                  {/* Stock */}
+                  <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-charcoal">
+                    <input type="checkbox" checked={v.inStock} onChange={(e) => set(v.uid, { inStock: e.target.checked, ...(e.target.checked && v.track && !Number(v.qty) ? { track: false, qty: "" } : {}) })} className="h-5 w-5 accent-burgundy" />
+                    In stock
+                    {!v.inStock && <span className="text-xs font-normal text-ink-muted">— shown as sold out</span>}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          {missing >= 0 && <p className="mt-2 text-xs font-semibold text-amber-800">Fill in {types.filter((t) => !variants[missing].values[t].trim()).join(" and ")} for variant {missing + 1}.</p>}
+          <button type="button" onClick={() => setVariants([...variants, newVariant()])} className={`${btn.outline} mt-3 w-full justify-center sm:w-auto`}>
+            <Plus className="h-4 w-4" aria-hidden="true" /> Add variant
+          </button>
         </>
       )}
     </section>

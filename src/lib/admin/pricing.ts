@@ -70,13 +70,15 @@ export function parsePricing(raw: unknown): { ok: true; options: PricingOption[]
   const seen = new Set<string>();
   for (const r of (Array.isArray(p.rows) ? p.rows : []).slice(0, MAX_VARIANTS + 1)) {
     const values = options.length ? (Array.isArray(r?.values) ? r.values.map((v) => text(v, 40)) : []) : [];
-    if (options.length && (values.length !== options.length || values.some((v, i) => !options[i].values.includes(v)))) continue; // a value was removed
+    if (options.length && (values.length !== options.length || values.some((v, i) => !options[i].values.includes(v)))) {
+      const missing = options.filter((_, i) => !values[i]).map((o) => o.name);
+      return { ok: false, message: `Variant ${rows.length + 1}: fill in ${missing.join(" and ") || "every field"}.` };
+    }
     const key = values.join(" / ").toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return { ok: false, message: `Two variants are both “${values.join(" · ")}”. Change or remove one.` };
     seen.add(key);
     const amount = money(r?.amount);
-    const label = values.join(" / ") || "the product";
-    if (!amount) return { ok: false, message: `Enter a price for ${label}.` };
+    if (!amount) return { ok: false, message: values.length ? `Enter a price for ${values.join(" · ")} (or choose “Same as main” and fill in the main price).` : "Enter the selling price." };
     const compare = money(r?.compare);
     const track = r?.track === true;
     rows.push({
